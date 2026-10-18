@@ -1,7 +1,9 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/timer_bar.gd" id="2_timer"]
+[ext_resource type="AudioStream" path="res://sounds/cheer.mp3" id="3_cheer"]
+[ext_resource type="AudioStream" path="res://sounds/uh_uh.mp3" id="4_uh_uh"]
 
 [sub_resource type="Theme" id="Theme_ui"]
 default_font_size = 16
@@ -138,3 +140,9 @@ theme_override_font_sizes/font_size = 14
 text = "Drag a shape into its hole, or tap a shape and then tap a hole."
 horizontal_alignment = 1
 autowrap_mode = 3
+
+[node name="Cheer" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("3_cheer")
+
+[node name="UhUh" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("4_uh_uh")

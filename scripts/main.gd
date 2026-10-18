@@ -16,6 +16,8 @@ const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tr
 @onready var tray: Panel = $Content/Board/Tray
 @onready var toast: PanelContainer = $Content/Board/Toast
 @onready var toast_label: Label = $Content/Board/Toast/Label
+@onready var cheer: AudioStreamPlayer = $Cheer
+@onready var uh_uh: AudioStreamPlayer = $UhUh
 
 var hole_count := 3
 var level_num := 0
@@ -207,6 +209,7 @@ func place(p: ShapeView) -> void:
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.z_index = 1
 	p.vanish_into(p.target_hole.norm_pos)
+	cheer.play()
 	pieces.erase(p)
 	if pieces.is_empty():
 		score += 1
@@ -214,9 +217,10 @@ func place(p: ShapeView) -> void:
 		end_level("Level cleared!", 0.9)
 
 
-func reject(p: ShapeView, hole: ShapeView) -> void:
-	p.shake()
-	hole.shake()
+func reject(p: ShapeView, _hole: ShapeView) -> void:
+	p.nod()
+	p.target_hole.bulge()
+	uh_uh.play()
 	p.move_to(p.home)
 
 
