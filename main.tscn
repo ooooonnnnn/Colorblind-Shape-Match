@@ -1,0 +1,123 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/timer_bar.gd" id="2_timer"]
+
+[sub_resource type="Theme" id="Theme_ui"]
+default_font_size = 16
+Label/colors/font_color = Color(0.603922, 0.639216, 0.709804, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_board"]
+bg_color = Color(0.145098, 0.164706, 0.215686, 1)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_toast"]
+content_margin_left = 24.0
+content_margin_top = 12.0
+content_margin_right = 24.0
+content_margin_bottom = 12.0
+bg_color = Color(0, 0, 0, 0.75)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("Theme_ui")
+script = ExtResource("1_main")
+
+[node name="Content" type="VBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 656.0
+offset_bottom = 800.0
+theme_override_constants/separation = 8
+
+[node name="Header" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LevelCaption" type="Label" parent="Content/Header"]
+layout_mode = 2
+text = "Level"
+
+[node name="LevelValue" type="Label" parent="Content/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
+text = "1"
+
+[node name="Gap" type="Control" parent="Content/Header"]
+custom_minimum_size = Vector2(14, 0)
+layout_mode = 2
+
+[node name="ScoreCaption" type="Label" parent="Content/Header"]
+layout_mode = 2
+text = "Cleared"
+
+[node name="ScoreValue" type="Label" parent="Content/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
+text = "0"
+
+[node name="Spacer" type="Control" parent="Content/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HolesCaption" type="Label" parent="Content/Header"]
+layout_mode = 2
+text = "Holes"
+
+[node name="HoleCount" type="OptionButton" parent="Content/Header"]
+layout_mode = 2
+
+[node name="TimerBar" type="Control" parent="Content"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+script = ExtResource("2_timer")
+
+[node name="TimerText" type="Label" parent="Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "30s"
+
+[node name="Board" type="Panel" parent="Content"]
+custom_minimum_size = Vector2(640, 640)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_board")
+
+[node name="Toast" type="PanelContainer" parent="Content/Board"]
+modulate = Color(1, 1, 1, 0)
+z_index = 10
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_toast")
+
+[node name="Label" type="Label" parent="Content/Board/Toast"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
+theme_override_font_sizes/font_size = 22
+text = "Level cleared!"
+
+[node name="Hint" type="Label" parent="Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Drag a shape into its hole, or tap a shape and then tap a hole."
+horizontal_alignment = 1
+autowrap_mode = 3
