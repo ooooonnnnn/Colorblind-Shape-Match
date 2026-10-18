@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shape Match</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="stats">
+      <span>Level <b id="level">1</b></span>
+      <span>Cleared <b id="score">0</b></span>
+    </div>
+    <label class="holes-picker">
+      Holes
+      <select id="hole-count">
+        <option>2</option>
+        <option selected>3</option>
+        <option>4</option>
+        <option>5</option>
+      </select>
+    </label>
+  </header>
+
+  <div class="timer" aria-hidden="true"><div id="timer-bar"></div></div>
+  <div id="timer-text" class="timer-text" aria-live="off"></div>
+
+  <main>
+    <div id="board"></div>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </main>
+
+  <p class="hint">Drag a shape into its hole, or tap a shape and then tap a hole.</p>
+
+  <script src="game.js"></script>
+</body>
+</html>
