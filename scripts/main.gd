@@ -17,7 +17,6 @@ const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 @onready var tray: Panel = $Content/Board/Tray
 @onready var toast: PanelContainer = $Content/Board/Toast
 @onready var toast_label: Label = $Content/Board/Toast/Label
-@onready var cheer: AudioStreamPlayer = $Cheer
 @onready var uh_uh: AudioStreamPlayer = $UhUh
 @onready var chime: AudioStreamPlayer = $Chime
 
@@ -214,7 +213,6 @@ func place(p: ShapeView) -> void:
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.z_index = 1
 	p.vanish_into(p.target_hole.norm_pos)
-	cheer.play()
 	play_chime()
 	pieces.erase(p)
 	if pieces.is_empty():
