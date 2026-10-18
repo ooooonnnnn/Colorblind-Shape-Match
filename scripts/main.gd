@@ -1,8 +1,7 @@
 extends Control
 
-const LEVEL_TIME := 30.0     # seconds per level
+const CONFIG_PATH := "res://config.json"
 const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
-const PIECES_PER_SHAPE := 3  # copies of each shape to sort into its hole
 const SPACING := 16.0        # px of clear space between bounding circles at the start of a level
 const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tray edge
 const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
@@ -10,7 +9,6 @@ const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 @onready var content: VBoxContainer = $Content
 @onready var level_label: Label = $Content/Header/LevelValue
 @onready var score_label: Label = $Content/Header/ScoreValue
-@onready var hole_select: OptionButton = $Content/Header/HoleCount
 @onready var timer_bar: TimerBar = $Content/TimerBar
 @onready var timer_text: Label = $Content/TimerText
 @onready var board: Panel = $Content/Board
@@ -20,7 +18,10 @@ const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 @onready var uh_uh: AudioStreamPlayer = $UhUh
 @onready var chime: AudioStreamPlayer = $Chime
 
-var hole_count := 3
+var levels: Array[Dictionary] = []  # entries from CONFIG_PATH
+var hole_count := 0
+var pieces_per_shape := 0  # copies of each shape to sort into its hole
+var level_time := 0.0      # seconds; <= 0 means no time limit
 var level_num := 0
 var score := 0
 var holes: Array[ShapeView] = []
@@ -36,10 +37,7 @@ var _chime_step := 0  # rises with each placement, resets each level
 
 
 func _ready() -> void:
-	for n in [2, 3, 4, 5]:
-		hole_select.add_item(str(n), n)
-	hole_select.select(hole_select.get_item_index(hole_count))
-	hole_select.item_selected.connect(_on_hole_count_selected)
+	_load_levels()
 	resized.connect(_layout)
 	_layout()
 	new_level()
@@ -51,6 +49,34 @@ func _layout() -> void:
 	board.custom_minimum_size = board_size
 	content.position = Vector2(16, 12)
 	content.size = Vector2(board_size.x, 0)
+
+
+# ---------- Level config ----------
+
+## Reads the level list. Each entry is {duration, holes, shapes, repetitions};
+## see _level_config for how repetitions are walked.
+func _load_levels() -> void:
+	var data = JSON.parse_string(FileAccess.get_file_as_string(CONFIG_PATH))
+	if not (data is Dictionary and data.get("levels") is Array and not data.levels.is_empty()):
+		push_error("Bad or missing level list in %s" % CONFIG_PATH)
+		data = {"levels": [{}]}
+	for entry in data.levels:
+		levels.append({
+			"duration": float(entry.get("duration", 0)),
+			"holes": clampi(int(entry.get("holes", 3)), 1, Shapes.NAMES.size()),
+			"shapes": maxi(1, int(entry.get("shapes", 1))),
+			"repetitions": int(entry.get("repetitions", 0)),
+		})
+
+
+## The entry for level n (1-based), or {} once the list has run out. An entry
+## with repetitions <= 0 repeats forever.
+func _level_config(n: int) -> Dictionary:
+	for entry in levels:
+		if entry.repetitions <= 0 or n <= entry.repetitions:
+			return entry
+		n -= entry.repetitions
+	return {}
 
 
 # ---------- Layout ----------
@@ -129,15 +155,17 @@ func _place_tray(rect: Rect2) -> void:
 
 func new_level() -> void:
 	_level_id += 1
+	_clear_board()
+	var config := _level_config(level_num + 1)
+	if config.is_empty():
+		end_game()
+		return
 	_chime_step = 0
 	level_num += 1
 	level_label.text = str(level_num)
-	for node in holes + pieces:
-		node.queue_free()
-	holes.clear()
-	pieces.clear()
-	selected = null
-	drag = {}
+	hole_count = config.holes
+	pieces_per_shape = config.shapes
+	level_time = config.duration
 
 	var shapes := Shapes.pick(hole_count)
 	var side := ShapeView.side_for(board_size)
@@ -145,7 +173,7 @@ func new_level() -> void:
 	for shape in shapes:
 		hole_radii.append(Shapes.radius(shape.points) * side)
 	var piece_radii: Array[float] = []
-	for i in hole_count * PIECES_PER_SHAPE:
+	for i in hole_count * pieces_per_shape:
 		piece_radii.append(hole_radii[i % hole_count])
 	var hole_spots := _hole_row(hole_radii, hole_radii.max() * 2)
 	var tray_rect := _bounds(hole_spots, hole_radii).grow(TRAY_PADDING)
@@ -170,8 +198,27 @@ func new_level() -> void:
 		p.gui_input.connect(_on_piece_input.bind(p))
 		pieces.append(p)
 
-	deadline_ms = Time.get_ticks_msec() + int(LEVEL_TIME * 1000)
+	deadline_ms = Time.get_ticks_msec() + int(level_time * 1000)
 	transitioning = false
+
+
+func _clear_board() -> void:
+	for node in holes + pieces:
+		node.queue_free()
+	holes.clear()
+	pieces.clear()
+	selected = null
+	drag = {}
+
+
+## Leaves the board empty with the toast showing; no further levels start.
+func end_game() -> void:
+	transitioning = true
+	toast_label.text = "Game over"
+	if _toast_tween:
+		_toast_tween.kill()
+	_toast_tween = create_tween()
+	_toast_tween.tween_property(toast, "modulate:a", 1.0, 0.2)
 
 
 func end_level(message: String, delay: float) -> void:
@@ -196,8 +243,13 @@ func show_toast(message: String, duration: float) -> void:
 
 
 func _process(_delta: float) -> void:
+	if level_time <= 0:
+		timer_bar.ratio = 1.0
+		timer_bar.low = false
+		timer_text.text = "No time limit"
+		return
 	var remaining := maxi(0, deadline_ms - Time.get_ticks_msec())
-	timer_bar.ratio = remaining / (LEVEL_TIME * 1000)
+	timer_bar.ratio = remaining / (level_time * 1000)
 	timer_bar.low = remaining < 5000
 	timer_text.text = "%ds" % ceili(remaining / 1000.0)
 	if remaining == 0 and not transitioning:
@@ -336,13 +388,3 @@ func _end_drag() -> void:
 		place(p)
 	else:
 		reject(p, target)
-
-
-# ---------- Settings ----------
-
-func _on_hole_count_selected(index: int) -> void:
-	hole_count = hole_select.get_item_id(index)
-	level_num = 0
-	score = 0
-	score_label.text = str(score)
-	new_level()

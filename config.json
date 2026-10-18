@@ -1,0 +1,9 @@
+{
+	"levels": [
+		{ "duration": 0,  "holes": 1, "shapes": 1, "repetitions": 3 },
+		{ "duration": 0,  "holes": 2, "shapes": 1, "repetitions": 2 },
+		{ "duration": 30, "holes": 3, "shapes": 3, "repetitions": 3 },
+		{ "duration": 25, "holes": 4, "shapes": 3, "repetitions": 3 },
+		{ "duration": 25, "holes": 5, "shapes": 3, "repetitions": 0 }
+	]
+}
