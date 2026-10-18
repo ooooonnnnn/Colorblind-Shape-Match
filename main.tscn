@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/timer_bar.gd" id="2_timer"]
-[ext_resource type="AudioStream" path="res://sounds/cheer.wav" id="3_cheer"]
+[ext_resource type="AudioStream" path="res://sounds/cheer.mp3" id="3_cheer"]
 
 [sub_resource type="Theme" id="Theme_ui"]
 default_font_size = 16
