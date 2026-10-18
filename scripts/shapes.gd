@@ -27,6 +27,14 @@ static func make(shape_name: String) -> PackedVector2Array:
 	return PackedVector2Array()
 
 
+## Radius of the bounding circle around the box center, as a fraction of the box size.
+static func radius(points: PackedVector2Array) -> float:
+	var r := 0.0
+	for v in points:
+		r = maxf(r, v.distance_to(CENTER))
+	return r / 100.0
+
+
 ## Distinct shape families per level so every piece fits exactly one hole.
 static func pick(n: int) -> Array[Dictionary]:
 	var names := NAMES.duplicate()
