@@ -45,12 +45,17 @@ var shake_offset := 0.0:
 	set(v):
 		shake_offset = v
 		queue_redraw()
+var tilt := 0.0:  # radians
+	set(v):
+		tilt = v
+		queue_redraw()
 
 var _points := PackedVector2Array()  # centered on (0, 0)
 var _show_focus := false
 var _move_tween: Tween
 var _scale_tween: Tween
 var _shake_tween: Tween
+var _tilt_tween: Tween
 
 
 func setup(shape: Dictionary, piece: bool) -> void:
@@ -106,6 +111,25 @@ func shake() -> void:
 		_shake_tween.tween_property(self, "shake_offset", x, 0.07)
 
 
+# Rock clockwise and counter-clockwise, like shaking a head "no".
+func nod() -> void:
+	if _tilt_tween:
+		_tilt_tween.kill()
+	_tilt_tween = create_tween().set_trans(Tween.TRANS_SINE)
+	for deg in [16.0, -16.0, 10.0, -10.0, 0.0]:
+		_tilt_tween.tween_property(self, "tilt", deg_to_rad(deg), 0.09)
+
+
+# Swell briefly to point itself out.
+func bulge() -> void:
+	if _scale_tween:
+		_scale_tween.kill()
+	_scale_tween = create_tween().set_trans(Tween.TRANS_SINE)
+	for i in 2:
+		_scale_tween.tween_property(self, "visual_scale", 1.25, 0.14).set_ease(Tween.EASE_OUT)
+		_scale_tween.tween_property(self, "visual_scale", 1.0, 0.18).set_ease(Tween.EASE_IN)
+
+
 func _on_focus_entered() -> void:
 	# Only show the focus ring for keyboard focus, like CSS :focus-visible.
 	_show_focus = not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
@@ -116,7 +140,7 @@ func _draw() -> void:
 	if _points.is_empty():
 		return
 	var k := size.x / 100.0
-	draw_set_transform(size / 2 + Vector2(shake_offset, 0), 0.0, Vector2.ONE * k * visual_scale)
+	draw_set_transform(size / 2 + Vector2(shake_offset, 0), tilt, Vector2.ONE * k * visual_scale)
 	var outline := _points.duplicate()
 	outline.append(_points[0])
 

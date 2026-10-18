@@ -15,6 +15,7 @@ const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
 @onready var toast: PanelContainer = $Content/Board/Toast
 @onready var toast_label: Label = $Content/Board/Toast/Label
 @onready var cheer: AudioStreamPlayer = $Cheer
+@onready var uh_uh: AudioStreamPlayer = $UhUh
 
 var hole_count := 3
 var level_num := 0
@@ -157,8 +158,10 @@ func place(p: ShapeView) -> void:
 
 
 func reject(p: ShapeView, hole: ShapeView) -> void:
-	p.shake()
+	p.nod()
 	hole.shake()
+	p.target_hole.bulge()
+	uh_uh.play()
 	p.move_to(p.home)
 
 
