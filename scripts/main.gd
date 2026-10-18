@@ -243,10 +243,16 @@ func _end_drag() -> void:
 		p.move_to(p.home)
 		return
 
+	# A drop counts when the bounding circles touch; the right hole wins over a wrong one.
 	var target: ShapeView = null
-	var best := ShapeView.SIZE * 0.6
+	var best := INF
 	for hole in holes:
 		var dist := hole.norm_pos.distance_to(p.norm_pos)
+		if dist > hole.radius + p.radius:
+			continue
+		if hole == p.target_hole:
+			target = hole
+			break
 		if dist < best:
 			target = hole
 			best = dist

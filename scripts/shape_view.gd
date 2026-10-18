@@ -13,6 +13,7 @@ const ACCENT := Color.WHITE
 
 var is_piece := false
 var shape_name := ""
+var radius := 0.0  # bounding circle around the center, in board-relative units
 
 # Pieces only.
 var target_hole: ShapeView
@@ -54,8 +55,10 @@ func setup(shape: Dictionary, piece: bool) -> void:
 	shape_name = shape.name
 	is_piece = piece
 	_points.clear()
+	radius = 0.0
 	for v in shape.points:
 		_points.append(v - Shapes.CENTER)
+		radius = maxf(radius, (v - Shapes.CENTER).length() / 100.0 * SIZE)
 	set("accessibility_name", "%s %s" % [shape_name.replace("_", " "), "piece" if piece else "hole"])
 	focus_mode = Control.FOCUS_ALL
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
