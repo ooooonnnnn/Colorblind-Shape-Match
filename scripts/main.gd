@@ -40,7 +40,7 @@ func _ready() -> void:
 
 
 func _layout() -> void:
-	var side := clampf(minf(size.x - 32, size.y - 150), 100, 640)
+	var side := maxf(minf(size.x - 32, size.y - 150), 100)
 	board.custom_minimum_size = Vector2(side, side)
 	content.position = Vector2((size.x - side) / 2, 12)
 	content.size = Vector2(side, 0)
