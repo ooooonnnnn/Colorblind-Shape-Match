@@ -4,6 +4,7 @@ const LEVEL_TIME := 30.0     # seconds per level
 const HOLE_GAP := 0.19       # center-to-center spacing of holes
 const RING_RADIUS := 0.39    # distance of pieces from the board center
 const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
+const PIECES_PER_SHAPE := 3  # copies of each shape to sort into its hole
 
 @onready var content: VBoxContainer = $Content
 @onready var level_label: Label = $Content/Header/LevelValue
@@ -82,7 +83,7 @@ func new_level() -> void:
 
 	var shapes := Shapes.pick(hole_count)
 	var hole_spots := _hole_layout(hole_count)
-	var piece_spots := _ring_layout(hole_count)
+	var piece_spots := _ring_layout(hole_count * PIECES_PER_SHAPE)
 
 	for i in hole_count:
 		var hole := ShapeView.new()
@@ -92,10 +93,10 @@ func new_level() -> void:
 		hole.gui_input.connect(_on_hole_input.bind(hole))
 		holes.append(hole)
 
-	for i in hole_count:
+	for i in piece_spots.size():
 		var p := ShapeView.new()
-		p.setup(shapes[i], true)
-		p.target_hole = holes[i]
+		p.setup(shapes[i % hole_count], true)
+		p.target_hole = holes[i % hole_count]
 		p.home = piece_spots[i]
 		p.norm_pos = p.home
 		board.add_child(p)
@@ -140,15 +141,13 @@ func _process(_delta: float) -> void:
 
 func place(p: ShapeView) -> void:
 	p.placed = true
-	p.target_hole.filled = true
-	for node in [p, p.target_hole]:
-		node.release_focus()
-		node.focus_mode = Control.FOCUS_NONE
-		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		node.mouse_default_cursor_shape = Control.CURSOR_ARROW
+	p.release_focus()
+	p.focus_mode = Control.FOCUS_NONE
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.z_index = 1
-	p.move_to(p.target_hole.norm_pos)
-	if pieces.all(func(q: ShapeView) -> bool: return q.placed):
+	p.vanish_into(p.target_hole.norm_pos)
+	pieces.erase(p)
+	if pieces.is_empty():
 		score += 1
 		score_label.text = str(score)
 		end_level("Level cleared!", 0.9)
@@ -186,7 +185,7 @@ func tap_piece(p: ShapeView) -> void:
 
 
 func tap_hole(hole: ShapeView) -> void:
-	if not selected or hole.filled or transitioning:
+	if not selected or transitioning:
 		return
 	var p := selected
 	deselect()
@@ -248,7 +247,7 @@ func _end_drag() -> void:
 	var best := ShapeView.SIZE * 0.6
 	for hole in holes:
 		var dist := hole.norm_pos.distance_to(p.norm_pos)
-		if not hole.filled and dist < best:
+		if dist < best:
 			target = hole
 			best = dist
 

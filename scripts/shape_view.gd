@@ -30,9 +30,6 @@ var dragging := false:
 		dragging = v
 		queue_redraw()
 
-# Holes only.
-var filled := false
-
 var norm_pos := Vector2.ZERO:
 	set(v):
 		norm_pos = v
@@ -89,6 +86,16 @@ func move_to(target: Vector2, animate := true) -> void:
 		return
 	_move_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_move_tween.tween_property(self, "norm_pos", target, 0.25)
+
+
+## Slides into a hole, then shrinks and fades away before freeing itself.
+func vanish_into(target: Vector2) -> void:
+	move_to(target)
+	var t := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	t.tween_interval(0.2)
+	t.tween_property(self, "visual_scale", 0.0, 0.2)
+	t.parallel().tween_property(self, "modulate:a", 0.0, 0.2)
+	t.tween_callback(queue_free)
 
 
 func scale_to(s: float) -> void:
