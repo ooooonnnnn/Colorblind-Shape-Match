@@ -87,13 +87,6 @@ text = "0"
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="HolesCaption" type="Label" parent="Content/Header"]
-layout_mode = 2
-text = "Holes"
-
-[node name="HoleCount" type="OptionButton" parent="Content/Header"]
-layout_mode = 2
-
 [node name="TimerBar" type="Control" parent="Content"]
 custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
