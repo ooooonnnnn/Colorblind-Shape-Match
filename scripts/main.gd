@@ -157,9 +157,8 @@ func place(p: ShapeView) -> void:
 		end_level("Level cleared!", 0.9)
 
 
-func reject(p: ShapeView, hole: ShapeView) -> void:
+func reject(p: ShapeView, _hole: ShapeView) -> void:
 	p.nod()
-	hole.shake()
 	p.target_hole.bulge()
 	uh_uh.play()
 	p.move_to(p.home)
