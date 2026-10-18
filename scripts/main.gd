@@ -44,7 +44,8 @@ func _ready() -> void:
 
 
 func _layout() -> void:
-	board_size = Vector2(maxf(size.x - 32, 200), maxf(size.y - 150, 200))
+	# 95 px of header and timer above the board, 16 px margin below.
+	board_size = Vector2(maxf(size.x - 32, 200), maxf(size.y - 111, 200))
 	board.custom_minimum_size = board_size
 	content.position = Vector2(16, 12)
 	content.size = Vector2(board_size.x, 0)

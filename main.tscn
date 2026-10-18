@@ -134,12 +134,6 @@ theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
 theme_override_font_sizes/font_size = 22
 text = "Level cleared!"
 
-[node name="Hint" type="Label" parent="Content"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "Drag a shape into its hole, or tap a shape and then tap a hole."
-horizontal_alignment = 1
-autowrap_mode = 3
 
 [node name="Cheer" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("3_cheer")
