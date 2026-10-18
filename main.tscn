@@ -1,9 +1,10 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/timer_bar.gd" id="2_timer"]
 [ext_resource type="AudioStream" path="res://sounds/cheer.mp3" id="3_cheer"]
 [ext_resource type="AudioStream" path="res://sounds/uh_uh.mp3" id="4_uh_uh"]
+[ext_resource type="AudioStream" path="res://sounds/chime.mp3" id="5_chime"]
 
 [sub_resource type="Theme" id="Theme_ui"]
 default_font_size = 16
@@ -129,3 +130,6 @@ stream = ExtResource("3_cheer")
 
 [node name="UhUh" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("4_uh_uh")
+
+[node name="Chime" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("5_chime")

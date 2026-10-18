@@ -4,6 +4,7 @@ const LEVEL_TIME := 30.0     # seconds per level
 const HOLE_GAP := 0.19       # center-to-center spacing of holes
 const RING_RADIUS := 0.39    # distance of pieces from the board center
 const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
+const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 
 @onready var content: VBoxContainer = $Content
 @onready var level_label: Label = $Content/Header/LevelValue
@@ -16,6 +17,7 @@ const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
 @onready var toast_label: Label = $Content/Board/Toast/Label
 @onready var cheer: AudioStreamPlayer = $Cheer
 @onready var uh_uh: AudioStreamPlayer = $UhUh
+@onready var chime: AudioStreamPlayer = $Chime
 
 var hole_count := 3
 var level_num := 0
@@ -28,6 +30,7 @@ var deadline_ms := 0
 var transitioning := false
 var _level_id := 0  # lets a pending level change notice it was superseded
 var _toast_tween: Tween
+var _chime_step := 0  # rises with each placement, resets each level
 
 
 func _ready() -> void:
@@ -73,6 +76,7 @@ func _ring_layout(n: int) -> Array[Vector2]:
 
 func new_level() -> void:
 	_level_id += 1
+	_chime_step = 0
 	level_num += 1
 	level_label.text = str(level_num)
 	for node in holes + pieces:
@@ -151,10 +155,19 @@ func place(p: ShapeView) -> void:
 	p.z_index = 1
 	p.move_to(p.target_hole.norm_pos)
 	cheer.play()
+	play_chime()
 	if pieces.all(func(q: ShapeView) -> bool: return q.placed):
 		score += 1
 		score_label.text = str(score)
 		end_level("Level cleared!", 0.9)
+
+
+func play_chime() -> void:
+	var n := CHIME_STEPS.size()
+	var semitones: int = CHIME_STEPS[_chime_step % n] + 12 * floori(_chime_step / float(n))
+	chime.pitch_scale = pow(2.0, semitones / 12.0)
+	chime.play()
+	_chime_step += 1
 
 
 func reject(p: ShapeView, _hole: ShapeView) -> void:
