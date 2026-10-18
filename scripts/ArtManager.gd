@@ -1,11 +1,10 @@
-extends Node
-
-
-# Called when the node enters the scene tree for the first time.
-func _ready() -> void:
-	pass # Replace with function body.
-
-
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	pass
+func get_random_background_color() -> Color:
+	var base_color = Color("2ecc71") # ירוק בסיס
+	
+	# מגריל את הבהירות (Value) בין חשוך למואר
+	var random_v = randf_range(0.3, 0.9) 
+	# מגריל את הרוויה (Saturation) בין דהוי לרווי
+	var random_s = randf_range(0.4, 0.8) 
+	
+	# מחזיר צבע חדש שמבוסס על אותו גוון בדיוק, אבל עם תאורה ורוויה שונה
+	return Color.from_hsv(base_color.h, random_s, random_v)
