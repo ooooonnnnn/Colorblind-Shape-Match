@@ -3,7 +3,7 @@ extends Control
 ## A piece or a hole. Draws one polygon from a 100x100 box, positioned by its
 ## center in board-relative (0..1) coordinates so it follows board resizes.
 
-const SIZE := 0.15  # width as a fraction of the board
+const SIZE := 0.15  # width as a fraction of the board's shorter side
 
 const PIECE_FILL := Color("f1ede2")
 const PIECE_EDGE := Color("8b8778")
@@ -13,6 +13,7 @@ const ACCENT := Color.WHITE
 
 var is_piece := false
 var shape_name := ""
+var radius := 0.0  # bounding circle around the center, as a fraction of the side
 
 # Pieces only.
 var target_hole: ShapeView
@@ -29,9 +30,6 @@ var dragging := false:
 	set(v):
 		dragging = v
 		queue_redraw()
-
-# Holes only.
-var filled := false
 
 var norm_pos := Vector2.ZERO:
 	set(v):
@@ -64,6 +62,7 @@ func setup(shape: Dictionary, piece: bool) -> void:
 	_points.clear()
 	for v in shape.points:
 		_points.append(v - Shapes.CENTER)
+	radius = Shapes.radius(shape.points)
 	set("accessibility_name", "%s %s" % [shape_name.replace("_", " "), "piece" if piece else "hole"])
 	focus_mode = Control.FOCUS_ALL
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -77,11 +76,16 @@ func _ready() -> void:
 	_update_layout()
 
 
+## Side length in pixels of a piece or hole on a board of this size.
+static func side_for(board_size: Vector2) -> float:
+	return minf(board_size.x, board_size.y) * SIZE
+
+
 func _update_layout() -> void:
 	var board := get_parent() as Control
 	if board == null:
 		return
-	var side := board.size.x * SIZE
+	var side := side_for(board.size)
 	size = Vector2(side, side)
 	position = norm_pos * board.size - size / 2
 
@@ -94,6 +98,16 @@ func move_to(target: Vector2, animate := true) -> void:
 		return
 	_move_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_move_tween.tween_property(self, "norm_pos", target, 0.25)
+
+
+## Slides into a hole, then shrinks and fades away before freeing itself.
+func vanish_into(target: Vector2) -> void:
+	move_to(target)
+	var t := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	t.tween_interval(0.2)
+	t.tween_property(self, "visual_scale", 0.0, 0.2)
+	t.parallel().tween_property(self, "modulate:a", 0.0, 0.2)
+	t.tween_callback(queue_free)
 
 
 func scale_to(s: float) -> void:

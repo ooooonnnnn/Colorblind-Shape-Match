@@ -1,9 +1,10 @@
 extends Control
 
 const LEVEL_TIME := 30.0     # seconds per level
-const HOLE_GAP := 0.19       # center-to-center spacing of holes
-const RING_RADIUS := 0.39    # distance of pieces from the board center
 const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
+const PIECES_PER_SHAPE := 3  # copies of each shape to sort into its hole
+const SPACING := 16.0        # px of clear space between bounding circles at the start of a level
+const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tray edge
 const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 
 @onready var content: VBoxContainer = $Content
@@ -13,6 +14,7 @@ const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 @onready var timer_bar: TimerBar = $Content/TimerBar
 @onready var timer_text: Label = $Content/TimerText
 @onready var board: Panel = $Content/Board
+@onready var tray: Panel = $Content/Board/Tray
 @onready var toast: PanelContainer = $Content/Board/Toast
 @onready var toast_label: Label = $Content/Board/Toast/Label
 @onready var cheer: AudioStreamPlayer = $Cheer
@@ -28,6 +30,7 @@ var selected: ShapeView
 var drag := {}  # empty when nothing is being dragged
 var deadline_ms := 0
 var transitioning := false
+var board_size := Vector2.ZERO  # the board's laid-out size, known before containers sort
 var _level_id := 0  # lets a pending level change notice it was superseded
 var _toast_tween: Tween
 var _chime_step := 0  # rises with each placement, resets each level
@@ -44,32 +47,83 @@ func _ready() -> void:
 
 
 func _layout() -> void:
-	var side := clampf(minf(size.x - 32, size.y - 150), 100, 640)
-	board.custom_minimum_size = Vector2(side, side)
-	content.position = Vector2((size.x - side) / 2, 12)
-	content.size = Vector2(side, 0)
+	# 95 px of header and timer above the board, 16 px margin below.
+	board_size = Vector2(maxf(size.x - 32, 200), maxf(size.y - 111, 200))
+	board.custom_minimum_size = board_size
+	content.position = Vector2(16, 12)
+	content.size = Vector2(board_size.x, 0)
 
 
 # ---------- Layout ----------
 
-func _hole_layout(n: int) -> Array[Vector2]:
-	var rows: Array = {2: [2], 3: [3], 4: [2, 2], 5: [3, 2]}[n]
+## Pixel centers for the holes, in a row centered on the board. The gap between
+## neighbours' bounding circles is wider than the widest piece, so no piece can
+## touch two holes at once.
+func _hole_row(radii: Array[float], widest_piece: float) -> Array[Vector2]:
+	var xs: Array[float] = [0.0]
+	for i in range(1, radii.size()):
+		xs.append(xs[i - 1] + radii[i - 1] + radii[i] + widest_piece + SPACING)
+	var row_center := (xs[-1] + radii[-1] - radii[0]) / 2
 	var spots: Array[Vector2] = []
-	for r in rows.size():
-		var y := 0.5 + (r - (rows.size() - 1) / 2.0) * HOLE_GAP
-		for i in rows[r]:
-			spots.append(Vector2(0.5 + (i - (rows[r] - 1) / 2.0) * HOLE_GAP, y))
-	spots.shuffle()
+	for x in xs:
+		spots.append(board_size / 2 + Vector2(x - row_center, 0))
 	return spots
 
 
-func _ring_layout(n: int) -> Array[Vector2]:
-	var offset := randf_range(0, TAU)
-	var spots: Array[Vector2] = []
-	for i in n:
-		spots.append(Vector2(0.5, 0.5) + Vector2.from_angle(offset + TAU * i / n) * RING_RADIUS)
-	spots.shuffle()
-	return spots
+## The smallest rectangle around the given circles.
+func _bounds(centers: Array[Vector2], radii: Array[float]) -> Rect2:
+	var rect := Rect2(centers[0], Vector2.ZERO)
+	for i in centers.size():
+		rect = rect.merge(Rect2(centers[i] - Vector2.ONE * radii[i], Vector2.ONE * radii[i] * 2))
+	return rect
+
+
+## Random pixel centers for the pieces that keep clear of each other and of keep_out.
+func _scatter_pieces(radii: Array[float], keep_out: Rect2) -> Array[Vector2]:
+	for attempt in 100:
+		var spots: Array[Vector2] = []
+		for r in radii:
+			var spot := _free_spot(spots, radii, keep_out)
+			if not spot.is_finite():
+				break
+			spots.append(spot)
+		if spots.size() == radii.size():
+			return spots
+	push_error("Could not fit %d pieces on the board" % radii.size())
+	var fallback: Array[Vector2] = []
+	fallback.resize(radii.size())
+	fallback.fill(board_size / 2)
+	return fallback
+
+
+## A random spot for piece number spots.size(), or Vector2.INF if none was found.
+func _free_spot(spots: Array[Vector2], radii: Array[float], keep_out: Rect2) -> Vector2:
+	var r := radii[spots.size()]
+	var blocked := keep_out.grow(r + SPACING)
+	for _try in 200:
+		var c := Vector2(randf_range(r, board_size.x - r), randf_range(r, board_size.y - r))
+		if blocked.has_point(c):
+			continue
+		var free := true
+		for j in spots.size():
+			if c.distance_to(spots[j]) <= radii[j] + r + SPACING:
+				free = false
+				break
+		if free:
+			return c
+	return Vector2.INF
+
+
+## Positions the tray behind the holes, anchored so it follows board resizes.
+func _place_tray(rect: Rect2) -> void:
+	tray.anchor_left = rect.position.x / board_size.x
+	tray.anchor_top = rect.position.y / board_size.y
+	tray.anchor_right = rect.end.x / board_size.x
+	tray.anchor_bottom = rect.end.y / board_size.y
+	tray.offset_left = 0
+	tray.offset_top = 0
+	tray.offset_right = 0
+	tray.offset_bottom = 0
 
 
 # ---------- Level lifecycle ----------
@@ -87,22 +141,31 @@ func new_level() -> void:
 	drag = {}
 
 	var shapes := Shapes.pick(hole_count)
-	var hole_spots := _hole_layout(hole_count)
-	var piece_spots := _ring_layout(hole_count)
+	var side := ShapeView.side_for(board_size)
+	var hole_radii: Array[float] = []
+	for shape in shapes:
+		hole_radii.append(Shapes.radius(shape.points) * side)
+	var piece_radii: Array[float] = []
+	for i in hole_count * PIECES_PER_SHAPE:
+		piece_radii.append(hole_radii[i % hole_count])
+	var hole_spots := _hole_row(hole_radii, hole_radii.max() * 2)
+	var tray_rect := _bounds(hole_spots, hole_radii).grow(TRAY_PADDING)
+	_place_tray(tray_rect)
+	var piece_spots := _scatter_pieces(piece_radii, tray_rect)
 
 	for i in hole_count:
 		var hole := ShapeView.new()
 		hole.setup(shapes[i], false)
-		hole.norm_pos = hole_spots[i]
+		hole.norm_pos = hole_spots[i] / board_size
 		board.add_child(hole)
 		hole.gui_input.connect(_on_hole_input.bind(hole))
 		holes.append(hole)
 
-	for i in hole_count:
+	for i in piece_radii.size():
 		var p := ShapeView.new()
-		p.setup(shapes[i], true)
-		p.target_hole = holes[i]
-		p.home = piece_spots[i]
+		p.setup(shapes[i % hole_count], true)
+		p.target_hole = holes[i % hole_count]
+		p.home = piece_spots[i] / board_size
 		p.norm_pos = p.home
 		board.add_child(p)
 		p.gui_input.connect(_on_piece_input.bind(p))
@@ -146,17 +209,15 @@ func _process(_delta: float) -> void:
 
 func place(p: ShapeView) -> void:
 	p.placed = true
-	p.target_hole.filled = true
-	for node in [p, p.target_hole]:
-		node.release_focus()
-		node.focus_mode = Control.FOCUS_NONE
-		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		node.mouse_default_cursor_shape = Control.CURSOR_ARROW
+	p.release_focus()
+	p.focus_mode = Control.FOCUS_NONE
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.z_index = 1
-	p.move_to(p.target_hole.norm_pos)
+	p.vanish_into(p.target_hole.norm_pos)
 	cheer.play()
 	play_chime()
-	if pieces.all(func(q: ShapeView) -> bool: return q.placed):
+	pieces.erase(p)
+	if pieces.is_empty():
 		score += 1
 		score_label.text = str(score)
 		end_level("Level cleared!", 0.9)
@@ -203,7 +264,7 @@ func tap_piece(p: ShapeView) -> void:
 
 
 func tap_hole(hole: ShapeView) -> void:
-	if not selected or hole.filled or transitioning:
+	if not selected or transitioning:
 		return
 	var p := selected
 	deselect()
@@ -261,13 +322,15 @@ func _end_drag() -> void:
 		p.move_to(p.home)
 		return
 
+	# A drop counts when the bounding circles touch. _hole_row keeps holes far
+	# enough apart that a piece can touch at most one.
+	var side := ShapeView.side_for(board.size)
 	var target: ShapeView = null
-	var best := ShapeView.SIZE * 0.6
 	for hole in holes:
-		var dist := hole.norm_pos.distance_to(p.norm_pos)
-		if not hole.filled and dist < best:
+		var dist := ((hole.norm_pos - p.norm_pos) * board.size).length()
+		if dist <= (hole.radius + p.radius) * side:
 			target = hole
-			best = dist
+			break
 
 	if not target:
 		p.move_to(p.home)

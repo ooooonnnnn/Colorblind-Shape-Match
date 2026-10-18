@@ -1,66 +1,38 @@
 class_name Shapes
 ## Shape generators. Each returns a closed polygon in a 100x100 box centered on (50, 50).
 
-const NAMES := [
-	"triangle", "square", "rectangle", "pentagon", "hexagon", "octagon", "star", "cross",
-	"diamond", "trapezoid", "arrow", "l_shape", "t_shape", "heart", "crescent", "ellipse", "blob",
-]
+const NAMES := ["square", "circle", "triangle", "star", "kite", "crescent"]
 
 const CENTER := Vector2(50, 50)
 
 
 static func make(shape_name: String) -> PackedVector2Array:
 	match shape_name:
-		"triangle":
-			return _poly([[50, 6], [94, 84], [6, 84]])
 		"square":
 			return _poly([[16, 16], [84, 16], [84, 84], [16, 84]])
-		"rectangle":
-			var h := randf_range(16, 22)
-			return _poly([[6, 50 - h], [94, 50 - h], [94, 50 + h], [6, 50 + h]])
-		"pentagon":
-			return _ngon(5)
-		"hexagon":
-			return _ngon(6)
-		"octagon":
-			return _ngon(8)
+		"circle":
+			return _ellipse(46, 46)
+		"triangle":
+			return _poly([[50, 6], [94, 84], [6, 84]])
 		"star":
-			var points := randi_range(4, 6)
-			var inner := randf_range(18, 24)
 			var radii := []
-			for i in points * 2:
-				radii.append(inner if i % 2 else 48.0)
+			for i in 10:
+				radii.append(20.0 if i % 2 else 48.0)
 			return _radial(radii)
-		"cross":
-			var t := randf_range(12, 16)
-			var a := 50 - t
-			var b := 50 + t
-			return _poly([[a, 4], [b, 4], [b, a], [96, a], [96, b], [b, b], [b, 96], [a, 96], [a, b], [4, b], [4, a], [a, a]])
-		"diamond":
-			var w := randf_range(26, 32)
-			return _poly([[50, 4], [50 + w, 50], [50, 96], [50 - w, 50]])
-		"trapezoid":
-			var top := randf_range(14, 24)
-			return _poly([[50 - top, 22], [50 + top, 22], [94, 78], [6, 78]])
-		"arrow":
-			return _poly([[6, 38], [56, 38], [56, 14], [94, 50], [56, 86], [56, 62], [6, 62]])
-		"l_shape":
-			return _poly([[16, 6], [44, 6], [44, 66], [86, 66], [86, 94], [16, 94]])
-		"t_shape":
-			return _poly([[6, 8], [94, 8], [94, 36], [64, 36], [64, 94], [36, 94], [36, 36], [6, 36]])
-		"heart":
-			return _heart()
+		"kite":
+			return _poly([[50, 4], [78, 36], [50, 96], [22, 36]])
 		"crescent":
 			return _crescent()
-		"ellipse":
-			return _ellipse(46, randf_range(22, 30))
-		"blob":
-			var radii := []
-			for i in 7:
-				radii.append(randf_range(26, 47))
-			return _radial(radii, randf_range(0, 360))
 	push_error("Unknown shape: %s" % shape_name)
 	return PackedVector2Array()
+
+
+## Radius of the bounding circle around the box center, as a fraction of the box size.
+static func radius(points: PackedVector2Array) -> float:
+	var r := 0.0
+	for v in points:
+		r = maxf(r, v.distance_to(CENTER))
+	return r / 100.0
 
 
 ## Distinct shape families per level so every piece fits exactly one hole.
@@ -92,35 +64,11 @@ static func _radial(radii: Array, start := -90.0) -> PackedVector2Array:
 	return points
 
 
-static func _ngon(n: int) -> PackedVector2Array:
-	var radii := []
-	radii.resize(n)
-	radii.fill(46.0)
-	return _radial(radii)
-
-
 static func _ellipse(rx: float, ry: float, steps := 48) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	for i in steps:
 		var t := TAU * i / steps
 		points.append(CENTER + Vector2(rx * cos(t), ry * sin(t)))
-	return points
-
-
-static func _heart() -> PackedVector2Array:
-	# Cubic Bezier segments: start, control 1, control 2, end.
-	var segments := [
-		[Vector2(50, 90), Vector2(14, 64), Vector2(2, 40), Vector2(14, 22)],
-		[Vector2(14, 22), Vector2(26, 6), Vector2(46, 10), Vector2(50, 28)],
-		[Vector2(50, 28), Vector2(54, 10), Vector2(74, 6), Vector2(86, 22)],
-		[Vector2(86, 22), Vector2(98, 40), Vector2(86, 64), Vector2(50, 90)],
-	]
-	var steps := 12
-	var points := PackedVector2Array([segments[0][0]])
-	for s in segments:
-		for i in range(1, steps + 1):
-			points.append(s[0].bezier_interpolate(s[1], s[2], s[3], float(i) / steps))
-	points.remove_at(points.size() - 1)  # the last point closes back onto the first
 	return points
 
 
