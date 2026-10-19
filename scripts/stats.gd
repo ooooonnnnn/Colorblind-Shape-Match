@@ -3,7 +3,7 @@ extends RefCounted
 ## the article-based reading of them shown on the stats screen.
 ##
 ## Each record is {session, level, group, filter, shape, color, outcome,
-## spot_ms, wrong}:
+## spot_ms, wrong, touched_ms}:
 ##   session  unix time the game scene was opened
 ##   group    color group id, or BASELINE for levels with the dot filter off
 ##   outcome  "found" (placed), "seen" (touched but never placed) or "missed"
@@ -12,11 +12,11 @@ extends RefCounted
 ##            counts time the player was free to look, so time spent handling
 ##            other pieces is never included (see main.gd)
 ##   wrong    drops on a wrong hole
-##   moved    whether it was moved from where it started (dragged, or placed)
-##   at_ms    when it was placed, in ms since the game scene opened, or -1
+##   touched_ms  when the piece was first touched, in ms since its level
+##            started, or -1 if it never was
 ##
 ## Beside the records, PATH keeps each session's details (see add), for the
-## CSV export.
+## spreadsheet export (see export_xlsx).
 ##
 ## The reading follows "Advanced Colorimetry Protocols and Design in Color
 ## Vision Deficiency Diagnosis for Children Using Pseudoisochromatic Plates":
@@ -42,6 +42,8 @@ const SLOW_MIN_MS := 2000     # ...when also at least this much slower
 const LATE_RATIO := 3.0       # spot time against the player's usual that counts as a late find
 const LATE_MIN_MS := 1500     # ...when also at least this much slower, so quick players' jitter is not a stall
 
+const XlsxWriter := preload("res://scripts/xlsx_writer.gd")
+
 const GROUP_NOTES := {
 	"protan": "Protan (red-weak) is ~2% of males; reds can look dark or brownish to them.",
 	"deutan": "Deutan (green-weak) is the most common type, ~6% of males.",
@@ -53,14 +55,8 @@ static func load_records() -> Array:
 	return _load().pieces
 
 
-## {session id (as text): details}, see add.
-static func load_sessions() -> Dictionary:
-	return _load().sessions
-
-
 ## Saves records, and if given, the details of their session: {start (unix
-## time, the session id), end (unix time), board_color, backgrounds: {group id:
-## background dot color}, noise (as Dots.noise), size_percent}.
+## time, the session id), end (unix time), noise (as Dots.noise), size_percent}.
 static func add(records: Array, session := {}) -> void:
 	if records.is_empty() and session.is_empty():
 		return
@@ -84,56 +80,67 @@ static func _load() -> Dictionary:
 	return {"pieces": data.get("pieces", []), "sessions": sessions if sessions is Dictionary else {}}
 
 
-## Every session as a block of CSV: a header section with its start and end
-## (local time), board color, background dot colors, background and shape
-## noise and shape size, then a row per piece: its shape and color, whether it
-## was moved from where it started, and when it was placed, counted from the
-## start of the game. Details recorded before they were kept read "unknown".
-static func to_csv(records: Array, sessions: Dictionary) -> String:
+## Saves every session to an Excel workbook at path, one sheet per session.
+## Each sheet starts with a header section (start and end time, background and
+## shape noise, shape size), then a table with a row per piece: its shape, its
+## color, whether it was touched (placed in the right hole or not), and how
+## long after its level started it was first touched. Details recorded before
+## they were kept read "unknown".
+static func export_xlsx(path: String) -> Error:
+	var data := _load()
+	return XlsxWriter.write(path, workbook(data.pieces, data.sessions))
+
+
+## The sheets for export_xlsx, oldest session first.
+static func workbook(records: Array, sessions: Dictionary) -> Array:
 	var by_session := {}
 	for r in records:
 		by_session.get_or_add(str(int(r.session)), []).append(r)
 	var ids := by_session.keys()
 	ids.sort_custom(func(a, b): return int(a) < int(b))
-	var lines := PackedStringArray()
-	for id in ids:
+	var sheets := []
+	for n in ids.size():
+		var id: String = ids[n]
 		var s: Dictionary = sessions.get(id, {})
-		lines.append("Session start,%s" % _local_time(int(id)))
-		lines.append("Session end,%s" % (_local_time(int(s.end)) if s.has("end") else "unknown"))
-		lines.append("Board color,%s" % s.get("board_color", "unknown"))
-		var backgrounds: Dictionary = s.get("backgrounds", {})
-		if backgrounds.is_empty():
-			lines.append("Background dot color,%s" % ("none (filter off)" if s.has("backgrounds") else "unknown"))
-		for group in backgrounds:
-			lines.append("Background dot color (%s),%s" % [group, backgrounds[group]])
+		var rows := [
+			[_bold("Start time"), _local_time(int(id))],
+			[_bold("End time"), _local_time(int(s.end)) if s.has("end") else "unknown"],
+		]
 		for part in [["background", "Background"], ["shapes", "Shape"]]:
-			for channel in ["hue", "saturation", "value"]:
-				var noise: Dictionary = s.get("noise", {}).get(part[0], {}).get(channel, {})
-				lines.append("%s noise %s amplitude,%s" % [part[1], channel, _number(noise.get("amplitude"))])
-				lines.append("%s noise %s wavelength (px),%s" % [part[1], channel, _number(noise.get("wavelength"))])
-		lines.append("Shape size (%% of the board's shorter side),%s" % _number(s.get("size_percent")))
-		lines.append("")
-		lines.append("Shape,Color,Moved from original position,Time from game start (s)")
+			for channel in [["hue", "hue"], ["saturation", "saturation"], ["value", "brightness"]]:
+				var noise: Dictionary = s.get("noise", {}).get(part[0], {}).get(channel[0], {})
+				rows.append([_bold("%s noise: %s amplitude" % [part[1], channel[1]]), _number(noise.get("amplitude"))])
+				rows.append([_bold("%s noise: %s wavelength (px)" % [part[1], channel[1]]), _number(noise.get("wavelength"))])
+		rows.append([_bold("Shape size (% of the board's shorter side)"), _number(s.get("size_percent"))])
+		rows.append([])
+		rows.append([_bold("Shape type"), _bold("Color (hex)"), _bold("Touched"), _bold("Time from level start to touch (s)")])
 		for r in by_session[id]:
-			var at_ms := int(r.get("at_ms", -1))
-			lines.append(",".join(PackedStringArray([
-				r.shape,
-				"#" + str(r.color),
-				("yes" if r.moved else "no") if r.has("moved") else "unknown",
-				("%.1f" % (at_ms / 1000.0) if at_ms >= 0 else "not placed") if r.has("at_ms") else "unknown",
-			])))
-		lines.append("")
-	return "\n".join(lines)
+			var touched: bool = r.outcome != "missed"
+			var time = "unknown"
+			if r.has("touched_ms"):
+				time = snappedf(r.touched_ms / 1000.0, 0.001) if r.touched_ms >= 0 else null
+			rows.append([r.shape, "#" + str(r.color), "yes" if touched else "no", time])
+		sheets.append({
+			"name": "%d - %s" % [n + 1, _local_time(int(id)).replace(":", ".")],
+			"rows": rows,
+			"widths": [44, 18, 10, 34],
+		})
+	return sheets
+
+
+static func _bold(text: String) -> Dictionary:
+	return {"value": text, "bold": true}
 
 
 static func _local_time(unix: int) -> String:
 	return Time.get_datetime_string_from_unix_time(unix + Time.get_time_zone_from_system().bias * 60, true)
 
 
-static func _number(value) -> String:
+## value as a spreadsheet number, or "unknown" if it was not recorded.
+static func _number(value) -> Variant:
 	if value == null:
 		return "unknown"
-	return str(int(value)) if float(value) == int(value) else str(snappedf(value, 0.001))
+	return int(value) if float(value) == int(value) else snappedf(value, 0.001)
 
 
 static func _write(data: Dictionary) -> void:

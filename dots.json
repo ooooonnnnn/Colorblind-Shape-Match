@@ -1,6 +1,6 @@
 {
 	"max_radius": 6,
-	"gap": 1,
+	"gap": 1.5,
 	"fill_percent": 50,
 	"board_color": "#dde6ef"
 }

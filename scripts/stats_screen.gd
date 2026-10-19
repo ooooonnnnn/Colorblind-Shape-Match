@@ -38,17 +38,18 @@ func _ready() -> void:
 	_build()
 
 
-## Asks where to save all the records as a CSV file, with the system's own
-## save dialog where there is one (it is also the way to reach files on a tablet).
+## Asks where to save all the records as an Excel workbook, one sheet per
+## session, with the system's own save dialog where there is one (it is also
+## the way to reach files on a tablet).
 func _on_export() -> void:
 	var dialog := FileDialog.new()
 	dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
 	dialog.access = FileDialog.ACCESS_FILESYSTEM
 	dialog.use_native_dialog = true
-	dialog.filters = PackedStringArray(["*.csv ; CSV files"])
+	dialog.filters = PackedStringArray(["*.xlsx ; Excel workbooks"])
 	dialog.current_dir = OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
-	dialog.current_file = "shape_match_stats_%s.csv" % Time.get_date_string_from_system()
-	dialog.file_selected.connect(_save_csv)
+	dialog.current_file = "shape_match_stats_%s.xlsx" % Time.get_date_string_from_system()
+	dialog.file_selected.connect(_save_xlsx)
 	dialog.visibility_changed.connect(func():
 		if not dialog.visible:
 			dialog.queue_free()
@@ -57,17 +58,14 @@ func _on_export() -> void:
 	dialog.popup_centered_ratio(0.7)
 
 
-func _save_csv(path: String) -> void:
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	if file:
-		file.store_string(Stats.to_csv(Stats.load_records(), Stats.load_sessions()))
-		file.close()
-	else:
-		push_error("Could not export stats to %s: %s" % [path, error_string(FileAccess.get_open_error())])
-	export_button.text = "Saved!" if file else "Couldn't save"
+func _save_xlsx(path: String) -> void:
+	var err := Stats.export_xlsx(path)
+	if err != OK:
+		push_error("Could not export stats to %s: %s" % [path, error_string(err)])
+	export_button.text = "Saved!" if err == OK else "Couldn't save"
 	get_tree().create_timer(2.0).timeout.connect(func():
 		if is_instance_valid(export_button):
-			export_button.text = "Export CSV"
+			export_button.text = "Export spreadsheet"
 	)
 
 

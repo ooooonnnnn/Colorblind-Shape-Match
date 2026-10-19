@@ -2,15 +2,15 @@
 	"background": {
 		"hue": {
 			"wavelength": 10,
-			"amplitude": 0.02
+			"amplitude": 0.03
 		},
 		"saturation": {
 			"wavelength": 10,
-			"amplitude": 0.05
+			"amplitude": 0.08
 		},
 		"value": {
 			"wavelength": 10,
-			"amplitude": 0.15
+			"amplitude": 0.12
 		}
 	},
 	"shapes": {
@@ -20,7 +20,7 @@
 		},
 		"saturation": {
 			"wavelength": 10,
-			"amplitude": 0.05
+			"amplitude": 0.0
 		},
 		"value": {
 			"wavelength": 10,

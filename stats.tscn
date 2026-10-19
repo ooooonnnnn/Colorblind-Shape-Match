@@ -76,7 +76,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(220, 0)
 layout_mode = 2
 size_flags_vertical = 4
-text = "Export CSV"
+text = "Export spreadsheet"
 
 [node name="Clear" type="Button" parent="Margin/Rows/Header"]
 unique_name_in_owner = true

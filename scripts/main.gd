@@ -53,7 +53,6 @@ var _chime_step := 0  # rises with each placement, resets each level
 # moment the player was last free to look for a piece, so a piece's spot time
 # never includes time spent handling another one.
 var _session := int(Time.get_unix_time_from_system())
-var _session_start_ms := Time.get_ticks_msec()
 var _session_info := {}  # this session's details for Stats.add, filled in _ready and as levels start
 var _level_group := ""  # the color group id, or Stats.BASELINE without the filter
 var _level_started_ms := 0
@@ -68,8 +67,6 @@ func _ready() -> void:
 	dots.colors_changed.connect(_recolor_pieces)
 	_session_info = {
 		"start": _session,
-		"board_color": "#" + dots.board_color.to_html(false),
-		"backgrounds": {},
 		"noise": dots.noise.duplicate(true),
 		"size_percent": snappedf(ShapeView.side_fraction * 100, 0.01),
 	}
@@ -189,8 +186,6 @@ func new_level() -> void:
 	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups))
 	dots.show_group(group)
 	_level_group = group.id if config.filter else Stats.BASELINE
-	if config.filter:
-		_session_info.backgrounds[group.id] = "#" + group.background.to_html(false)
 	hole_count = config.holes
 	pieces_per_shape = config.shapes
 	level_time = config.duration
@@ -231,7 +226,7 @@ func new_level() -> void:
 		p.set_meta("color", colors[i])
 		p.set_meta("spot_ms", -1)
 		p.set_meta("wrong", 0)
-		p.set_meta("moved", false)
+		p.set_meta("touched_ms", -1)
 		p.fill = dots.figure_color(colors[i])
 		p.target_hole = holes[i % hole_count]
 		p.home = piece_spots[i] / board_size
@@ -333,7 +328,6 @@ func _process(delta: float) -> void:
 
 func place(p: ShapeView) -> void:
 	p.placed = true
-	p.set_meta("moved", true)
 	p.release_focus()
 	p.focus_mode = Control.FOCUS_NONE
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -396,12 +390,14 @@ func deselect() -> void:
 # ---------- Stats ----------
 
 ## The first time a piece is touched, the time since the player was last free
-## to look is its spot time. Touching it also ends the search, so switching to
-## another piece only counts the time since this one was found.
+## to look is its spot time, and the time since the level started is kept for
+## the export. Touching it also ends the search, so switching to another piece
+## only counts the time since this one was found.
 func _spot(p: ShapeView) -> void:
 	var now := Time.get_ticks_msec()
 	if p.get_meta("spot_ms") < 0:
 		p.set_meta("spot_ms", now - _search_from_ms)
+		p.set_meta("touched_ms", now - _level_started_ms)
 	_search_from_ms = now
 
 
@@ -422,8 +418,7 @@ func _record(p: ShapeView, outcome: String) -> Dictionary:
 		"outcome": outcome,
 		"spot_ms": p.get_meta("spot_ms"),
 		"wrong": p.get_meta("wrong"),
-		"moved": p.get_meta("moved"),
-		"at_ms": Time.get_ticks_msec() - _session_start_ms if outcome == "found" else -1,
+		"touched_ms": p.get_meta("touched_ms"),
 	}
 
 
@@ -501,7 +496,6 @@ func _on_piece_input(event: InputEvent, p: ShapeView) -> void:
 		var delta: Vector2 = event.global_position - drag.start
 		if not drag.moved and delta.length() > DRAG_THRESHOLD:
 			drag.moved = true
-			p.set_meta("moved", true)
 			deselect()
 			p.dragging = true
 			effects.glow(p)
