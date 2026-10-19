@@ -79,6 +79,11 @@ void fragment() {
 			perlin(center / wavelength.x),
 			perlin(center / wavelength.y + vec2(173.0, 37.0)),
 			perlin(center / wavelength.z + vec2(59.0, 211.0)));
-	vec3 hsv = rgb_to_hsv(bases[base].rgb) + shift;
+	vec3 hsv = rgb_to_hsv(bases[base].rgb);
+	// A gray base has no hue to shift and must stay gray, so only its value varies.
+	if (hsv.y < 0.001) {
+		shift.xy = vec2(0.0);
+	}
+	hsv += shift;
 	COLOR = vec4(hsv_to_rgb(vec3(fract(hsv.x), clamp(hsv.yz, 0.0, 1.0))), 1.0);
 }

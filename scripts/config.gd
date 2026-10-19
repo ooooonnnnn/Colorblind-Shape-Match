@@ -1,10 +1,11 @@
 extends Control
 ## Edits the level sequences (LevelConfig), the dot filter (dots.json), the dot
-## color noise (noise.json) and the shape size (shape_size.json). The preview
-## shows all but the levels live; nothing is written until Save.
+## color noise (noise.json), the color groups (ColorGroups) and the shape size
+## (shape_size.json). The preview shows all but the levels live, with the color
+## group last chosen or edited; nothing is written until Save.
 
 const Dots := preload("res://scripts/dots.gd")
-const PREVIEW_SHAPES := ["square", "star", "crescent"]
+const ColorGroups := preload("res://scripts/color_groups.gd")
 const PREVIEW_SPACING := 16.0  # px between neighbouring preview shapes
 const TRAY_PADDING := 24.0     # px between the holes and the tray edge, as in the game
 const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1}
@@ -15,6 +16,10 @@ const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1}
 @onready var gap: SpinBox = %Gap
 @onready var fill: SpinBox = %Fill
 @onready var noise_grid: GridContainer = %Noise
+@onready var color_mode: OptionButton = %ColorMode
+@onready var play_group: OptionButton = %PlayGroup
+@onready var groups_grid: GridContainer = %Groups
+@onready var group_about: Label = %GroupAbout
 @onready var size_spin: SpinBox = %Size
 @onready var back: Button = %Back
 @onready var save: Button = %Save
@@ -24,6 +29,9 @@ const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1}
 
 var _rows: Array[Dictionary] = []  # each level sequence's controls, by field
 var _noise_spins := {}  # {part: {channel: {wavelength, amplitude}}} of SpinBoxes, as in Dots.noise
+var _groups := {}  # see ColorGroups.load_settings
+var _group_pickers := {}  # {group id: {background, shapes: {shape name: ColorPickerButton}}}
+var _previewed := ""  # the color group shown in the preview
 var _holes: Array[ShapeView] = []
 var _pieces: Array[ShapeView] = []
 
@@ -49,7 +57,8 @@ func _ready() -> void:
 	size_spin.value = ShapeView.side_fraction * 100
 	size_spin.value_changed.connect(_on_size_changed)
 
-	_build_preview()
+	preview.resized.connect(_layout_preview)
+	_build_groups()
 	back.pressed.connect(get_tree().change_scene_to_file.bind("res://menu.tscn"))
 	save.pressed.connect(_save)
 
@@ -162,19 +171,103 @@ func _on_noise_changed(_value: float) -> void:
 	dots.apply_noise(data)
 
 
-# ---------- Preview ----------
+# ---------- Color groups ----------
 
-func _on_dots_changed(_value: float) -> void:
-	dots.apply_config({"max_radius": max_radius.value, "gap": gap.value, "fill_percent": fill.value})
+func _build_groups() -> void:
+	_groups = ColorGroups.load_settings()
+	color_mode.add_item("Article-based (default)")
+	color_mode.add_item("Custom")
+	color_mode.selected = 1 if _groups.custom else 0
+	color_mode.item_selected.connect(_on_color_mode_selected)
+
+	for group in ColorGroups.ARTICLE:
+		play_group.add_item(group.name)
+		play_group.set_item_metadata(play_group.item_count - 1, group.id)
+	play_group.add_item("Random group each level")
+	play_group.set_item_metadata(play_group.item_count - 1, ColorGroups.RANDOM)
+	for i in play_group.item_count:
+		if play_group.get_item_metadata(i) == _groups.play:
+			play_group.selected = i
+	play_group.item_selected.connect(_on_play_group_selected)
+
+	for header in ["Group", "Background", "Shapes", "", ""]:
+		var label := Label.new()
+		label.text = header
+		groups_grid.add_child(label)
+	for group in ColorGroups.ARTICLE:
+		var name_label := Label.new()
+		name_label.text = group.name
+		name_label.tooltip_text = group.about
+		name_label.mouse_filter = Control.MOUSE_FILTER_PASS
+		groups_grid.add_child(name_label)
+		var pickers := {"background": _group_picker(group.id, "background"), "shapes": {}}
+		groups_grid.add_child(pickers.background)
+		for shape_name in group.shapes:
+			var cell := HBoxContainer.new()
+			var shape_label := Label.new()
+			shape_label.text = shape_name.capitalize()
+			cell.add_child(shape_label)
+			pickers.shapes[shape_name] = _group_picker(group.id, shape_name)
+			cell.add_child(pickers.shapes[shape_name])
+			groups_grid.add_child(cell)
+		_group_pickers[group.id] = pickers
+
+	_refresh_groups()
+	_preview_group(ColorGroups.ARTICLE[0].id if _groups.play == ColorGroups.RANDOM else _groups.play)
 
 
-func _on_size_changed(value: float) -> void:
-	ShapeView.side_fraction = value / 100
-	_layout_preview()
+func _on_color_mode_selected(index: int) -> void:
+	_groups.custom = index == 1
+	_refresh_groups()
+	_preview_group(_previewed)
 
 
-func _build_preview() -> void:
-	for shape_name in PREVIEW_SHAPES:
+func _on_play_group_selected(index: int) -> void:
+	_groups.play = play_group.get_item_metadata(index)
+	if _groups.play != ColorGroups.RANDOM:
+		_preview_group(_groups.play)
+
+
+## A swatch for a group's background (key "background") or one of its shapes.
+func _group_picker(id: String, key: String) -> ColorPickerButton:
+	var picker := ColorPickerButton.new()
+	picker.custom_minimum_size = Vector2(48, 28)
+	picker.edit_alpha = false
+	picker.color_changed.connect(_on_group_color_changed.bind(id, key))
+	return picker
+
+
+func _on_group_color_changed(color: Color, id: String, key: String) -> void:
+	if key == "background":
+		_groups.colors[id].background = color
+	else:
+		_groups.colors[id].shapes[key] = color
+	_preview_group(id)
+
+
+## Shows each group's colors in use, editable only when custom.
+func _refresh_groups() -> void:
+	for id in _group_pickers:
+		var colors := ColorGroups.colors(_groups, id)
+		var pickers: Dictionary = _group_pickers[id]
+		pickers.background.color = colors.background
+		pickers.background.disabled = not _groups.custom
+		for shape_name in pickers.shapes:
+			pickers.shapes[shape_name].color = colors.shapes[shape_name]
+			pickers.shapes[shape_name].disabled = not _groups.custom
+
+
+## Shows group id's shapes in its current colors in the preview.
+func _preview_group(id: String) -> void:
+	_previewed = id
+	var colors := ColorGroups.colors(_groups, id)
+	dots.show_group(colors)
+	group_about.text = ColorGroups.article_group(id).about
+	for view in _holes + _pieces:
+		view.queue_free()
+	_holes.clear()
+	_pieces.clear()
+	for shape_name in colors.shapes:
 		var shape := {"name": shape_name, "points": Shapes.make(shape_name)}
 		for piece in [false, true]:
 			var view := ShapeView.new()
@@ -187,7 +280,17 @@ func _build_preview() -> void:
 			else:
 				_holes.append(view)
 			preview.add_child(view)
-	preview.resized.connect(_layout_preview)
+	_layout_preview()
+
+
+# ---------- Preview ----------
+
+func _on_dots_changed(_value: float) -> void:
+	dots.apply_config({"max_radius": max_radius.value, "gap": gap.value, "fill_percent": fill.value})
+
+
+func _on_size_changed(value: float) -> void:
+	ShapeView.side_fraction = value / 100
 	_layout_preview()
 
 
@@ -198,13 +301,13 @@ func _layout_preview() -> void:
 		return
 	var side := ShapeView.side_for(board)
 	var step := side + PREVIEW_SPACING
-	var first_x := board.x / 2 - step * (PREVIEW_SHAPES.size() - 1) / 2
+	var first_x := board.x / 2 - step * (_holes.size() - 1) / 2
 	var holes_y := board.y * 0.3
-	for i in PREVIEW_SHAPES.size():
+	for i in _holes.size():
 		var x := first_x + step * i
 		_holes[i].norm_pos = Vector2(x, holes_y) / board
 		_pieces[i].norm_pos = Vector2(x, board.y * 0.75) / board
-	var row := Rect2(first_x - side / 2, holes_y - side / 2, step * PREVIEW_SHAPES.size() - PREVIEW_SPACING, side)
+	var row := Rect2(first_x - side / 2, holes_y - side / 2, step * _holes.size() - PREVIEW_SPACING, side)
 	var tray_rect := row.grow(TRAY_PADDING)
 	tray.position = tray_rect.position
 	tray.size = tray_rect.size
@@ -213,6 +316,6 @@ func _layout_preview() -> void:
 # ---------- Saving ----------
 
 func _save() -> void:
-	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ShapeView.save_size()]:
+	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size()]:
 		if result != OK:
 			push_error("Could not save config: %s" % error_string(result))

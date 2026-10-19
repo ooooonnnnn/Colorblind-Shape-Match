@@ -1,6 +1,7 @@
 extends Control
 
 const Dots := preload("res://scripts/dots.gd")
+const ColorGroups := preload("res://scripts/color_groups.gd")
 const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
 const SPACING := 16.0        # px of clear space between bounding circles at the start of a level
 const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tray edge
@@ -20,6 +21,7 @@ const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 @onready var dots: Dots = $Dots
 
 var levels: Array[Dictionary] = []  # see LevelConfig
+var color_groups := {}  # see ColorGroups.load_settings
 var hole_count := 0
 var pieces_per_shape := 0  # copies of each shape to sort into its hole
 var level_time := 0.0      # seconds; <= 0 means no time limit
@@ -39,6 +41,7 @@ var _chime_step := 0  # rises with each placement, resets each level
 
 func _ready() -> void:
 	levels = LevelConfig.load_levels()
+	color_groups = ColorGroups.load_settings()
 	ShapeView.load_size()
 	dots.colors_changed.connect(_recolor_pieces)
 	resized.connect(_layout)
@@ -150,11 +153,16 @@ func new_level() -> void:
 	_chime_step = 0
 	level_num += 1
 	level_label.text = str(level_num)
-	hole_count = config.holes
+	# Each level plays one color group, and only its shapes, so a level never
+	# has more holes than the group has shapes.
+	var group := ColorGroups.pick(color_groups)
+	var group_colors := ColorGroups.colors(color_groups, group)
+	dots.show_group(group_colors)
+	hole_count = mini(config.holes, group_colors.shapes.size())
 	pieces_per_shape = config.shapes
 	level_time = config.duration
 
-	var shapes := Shapes.pick(hole_count)
+	var shapes := Shapes.pick(hole_count, group_colors.shapes.keys())
 	var side := ShapeView.side_for(board_size)
 	var hole_radii: Array[float] = []
 	for shape in shapes:

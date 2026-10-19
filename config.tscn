@@ -203,6 +203,44 @@ layout_mode = 0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBox_tray")
 
+[node name="GroupsTitle" type="Label" parent="Margin/Columns/PreviewColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
+theme_override_font_sizes/font_size = 22
+text = "Color groups"
+
+[node name="GroupOptions" type="HBoxContainer" parent="Margin/Columns/PreviewColumn"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ColorModeLabel" type="Label" parent="Margin/Columns/PreviewColumn/GroupOptions"]
+layout_mode = 2
+text = "Colors"
+
+[node name="ColorMode" type="OptionButton" parent="Margin/Columns/PreviewColumn/GroupOptions"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="PlayGroupLabel" type="Label" parent="Margin/Columns/PreviewColumn/GroupOptions"]
+layout_mode = 2
+text = "Play"
+
+[node name="PlayGroup" type="OptionButton" parent="Margin/Columns/PreviewColumn/GroupOptions"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Groups" type="GridContainer" parent="Margin/Columns/PreviewColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 6
+columns = 5
+
+[node name="GroupAbout" type="Label" parent="Margin/Columns/PreviewColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
 [node name="Dots" type="CanvasLayer" parent="." node_paths=PackedStringArray("area", "mask")]
 script = ExtResource("2_dots")
 area = NodePath("../Margin/Columns/PreviewColumn/Preview")

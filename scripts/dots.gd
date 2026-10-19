@@ -144,6 +144,14 @@ func save_noise() -> Error:
 	return OK
 
 
+## Takes a color group's {background, shapes: {shape name: color}}, as from
+## ColorGroups.colors; shapes outside the group keep their colors.
+func show_group(colors: Dictionary) -> void:
+	background_color = colors.background
+	for shape_name in colors.shapes:
+		set(shape_name + "_color", colors.shapes[shape_name])
+
+
 ## The color pieces of this shape are filled with, and the base for their circles.
 func shape_color(shape_name: String) -> Color:
 	return get(shape_name + "_color")
