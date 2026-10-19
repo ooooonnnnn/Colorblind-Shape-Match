@@ -293,6 +293,13 @@ func _levels() -> Array[Dictionary]:
 # ---------- Dots ----------
 
 func _build_dots_page() -> void:
+	var reset := Button.new()
+	reset.text = "Reset this tab to defaults"
+	reset.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	reset.tooltip_text = "Dot pattern, color variation and board color go back to their starting values. Press Save to keep them."
+	reset.pressed.connect(_reset_dots_tab)
+	dots_page.add_child(reset)
+
 	var size_card := _card(dots_page, "Dot pattern",
 			"The dots that hide the shapes. Smaller, tighter dots make the shapes harder to pick out.")
 	var px := func(v): return "%s px" % (str(int(v)) if v == int(v) else "%.1f" % v)
@@ -330,14 +337,22 @@ func _build_dots_page() -> void:
 	_board_color.color = dots.board_color
 	_board_color.color_changed.connect(func(color): dots.board_color = color)
 	row.add_child(_board_color)
-	var reset := Button.new()
-	reset.text = "Default"
-	reset.pressed.connect(func():
-		_board_color.color = Dots.DEFAULT_BOARD_COLOR
-		dots.board_color = Dots.DEFAULT_BOARD_COLOR
-	)
-	row.add_child(reset)
 	board_card.add_child(row)
+
+
+## Puts every setting on the Dots tab back to Dots' defaults. The sliders'
+## own change handlers pass the values on to the preview.
+func _reset_dots_tab() -> void:
+	_dot_sliders.max_radius.value = Dots.DEFAULT_CONFIG.max_radius
+	_dot_sliders.gap.value = Dots.DEFAULT_CONFIG.gap
+	_dot_sliders.fill.value = Dots.DEFAULT_CONFIG.fill_percent
+	for part in _noise_sliders:
+		for channel in _noise_sliders[part]:
+			var defaults: Dictionary = Dots.DEFAULT_NOISE[part][channel]
+			_noise_sliders[part][channel].amplitude.value = defaults.amplitude
+			_noise_sliders[part][channel].wavelength.value = defaults.wavelength
+	_board_color.color = Dots.DEFAULT_BOARD_COLOR
+	dots.board_color = Dots.DEFAULT_BOARD_COLOR
 
 
 func _on_dots_changed() -> void:
