@@ -12,6 +12,8 @@ const CONFIG_PATH := "res://dots.json"
 const NOISE_PATH := "res://noise.json"
 const MIN_RADIUS := 1.0     # px; spots that only fit a smaller circle are skipped
 const CELL := 4.0          # px; side of the cells used to track where free space is left
+const NOISE_PARTS := {"background": "background", "shapes": "shape"}  # NOISE_PATH key: shader uniform prefix
+const NOISE_CHANNELS := ["hue", "saturation", "value"]
 
 @export var area: Control  ## the part of the screen the circles fill
 @export var mask: Control  ## stays clear of circles
@@ -28,6 +30,8 @@ const CELL := 4.0          # px; side of the cells used to track where free spac
 var max_radius := 14.0  # px
 var gap := 3.0          # px between neighbouring circles
 var fill := 0.5         # fraction of the area outside the mask to cover
+## {part: {channel: {wavelength, amplitude}}} for each NOISE_PARTS key and NOISE_CHANNELS entry
+var noise := {}
 
 var _background := ColorRect.new()
 var _circles := MultiMeshInstance2D.new()
@@ -89,27 +93,55 @@ func save_config() -> Error:
 	return OK
 
 
-## Gives the circle shader each H, S and V noise's wavelength and amplitude,
-## separately for the background and the shapes.
 func _load_noise() -> void:
 	var data = JSON.parse_string(FileAccess.get_file_as_string(NOISE_PATH))
 	if not data is Dictionary:
 		push_error("Bad or missing noise config in %s" % NOISE_PATH)
 		data = {}
-	for part in [["background", "background"], ["shapes", "shape"]]:
-		var channels = data.get(part[0])
+	apply_noise(data)
+
+
+## Takes the H, S and V noises' wavelength and amplitude, separately for the
+## background and the shapes, shaped like NOISE_PATH; missing values keep their
+## current one (wavelength 1, amplitude 0 at first). The circles show it at once.
+func apply_noise(data: Dictionary) -> void:
+	for part in NOISE_PARTS:
+		var channels = data.get(part)
 		if not channels is Dictionary:
 			channels = {}
+		if not noise.has(part):
+			noise[part] = {}
 		var wavelength := Vector3.ONE
 		var amplitude := Vector3.ZERO
-		for i in 3:
-			var noise = channels.get(["hue", "saturation", "value"][i])
-			if not noise is Dictionary:
-				noise = {}
-			wavelength[i] = maxf(1.0, float(noise.get("wavelength", 1)))
-			amplitude[i] = float(noise.get("amplitude", 0))
-		_circles.material.set_shader_parameter(part[1] + "_wavelength", wavelength)
-		_circles.material.set_shader_parameter(part[1] + "_amplitude", amplitude)
+		for i in NOISE_CHANNELS.size():
+			var channel: String = NOISE_CHANNELS[i]
+			var current: Dictionary = noise[part].get(channel, {"wavelength": 1.0, "amplitude": 0.0})
+			var given = channels.get(channel)
+			if not given is Dictionary:
+				given = {}
+			wavelength[i] = maxf(1.0, float(given.get("wavelength", current.wavelength)))
+			amplitude[i] = float(given.get("amplitude", current.amplitude))
+			noise[part][channel] = {"wavelength": wavelength[i], "amplitude": amplitude[i]}
+		_circles.material.set_shader_parameter(NOISE_PARTS[part] + "_wavelength", wavelength)
+		_circles.material.set_shader_parameter(NOISE_PARTS[part] + "_amplitude", amplitude)
+
+
+func save_noise() -> Error:
+	var file := FileAccess.open(NOISE_PATH, FileAccess.WRITE)
+	if file == null:
+		return FileAccess.get_open_error()
+	var data := {}
+	for part in NOISE_PARTS:
+		data[part] = {}
+		for channel in NOISE_CHANNELS:
+			var wavelength: float = noise[part][channel].wavelength
+			data[part][channel] = {
+				# Keep whole numbers free of a trailing .0.
+				"wavelength": int(wavelength) if wavelength == int(wavelength) else wavelength,
+				"amplitude": snappedf(noise[part][channel].amplitude, 0.001),
+			}
+	file.store_string(JSON.stringify(data, "\t", false) + "\n")
+	return OK
 
 
 ## The color pieces of this shape are filled with, and the base for their circles.

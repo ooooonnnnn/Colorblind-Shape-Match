@@ -1,7 +1,7 @@
 extends Control
-## Edits the level sequences (LevelConfig), the dot filter (dots.json) and the
-## shape size (shape_size.json). The preview shows the last two live; nothing
-## is written until Save.
+## Edits the level sequences (LevelConfig), the dot filter (dots.json), the dot
+## color noise (noise.json) and the shape size (shape_size.json). The preview
+## shows all but the levels live; nothing is written until Save.
 
 const Dots := preload("res://scripts/dots.gd")
 const PREVIEW_SHAPES := ["square", "star", "crescent"]
@@ -14,6 +14,7 @@ const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1}
 @onready var max_radius: SpinBox = %MaxRadius
 @onready var gap: SpinBox = %Gap
 @onready var fill: SpinBox = %Fill
+@onready var noise_grid: GridContainer = %Noise
 @onready var size_spin: SpinBox = %Size
 @onready var back: Button = %Back
 @onready var save: Button = %Save
@@ -22,6 +23,7 @@ const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1}
 @onready var dots: Dots = $Dots
 
 var _rows: Array[Dictionary] = []  # each level sequence's controls, by field
+var _noise_spins := {}  # {part: {channel: {wavelength, amplitude}}} of SpinBoxes, as in Dots.noise
 var _holes: Array[ShapeView] = []
 var _pieces: Array[ShapeView] = []
 
@@ -41,6 +43,7 @@ func _ready() -> void:
 	fill.value = dots.fill * 100
 	for spin in [max_radius, gap, fill]:
 		spin.value_changed.connect(_on_dots_changed)
+	_build_noise_grid()
 
 	ShapeView.load_size()
 	size_spin.value = ShapeView.side_fraction * 100
@@ -122,6 +125,43 @@ func _levels() -> Array[Dictionary]:
 	return levels
 
 
+# ---------- Dot color noise ----------
+
+## A row per channel, with each part's wavelength and amplitude side by side.
+func _build_noise_grid() -> void:
+	noise_grid.add_child(Label.new())
+	for part in Dots.NOISE_PARTS:
+		for field in ["wavelength", "amplitude"]:
+			var header := Label.new()
+			header.text = "%s %s" % [part.capitalize(), field]
+			noise_grid.add_child(header)
+		_noise_spins[part] = {}
+	for channel in Dots.NOISE_CHANNELS:
+		var label := Label.new()
+		label.text = channel.capitalize()
+		noise_grid.add_child(label)
+		for part in Dots.NOISE_PARTS:
+			var values: Dictionary = dots.noise[part][channel]
+			var wavelength := _spin(1, 2000, values.wavelength, "px")
+			var amplitude := _spin(0, 1, values.amplitude)
+			amplitude.step = 0.01
+			amplitude.value = values.amplitude
+			for spin in [wavelength, amplitude]:
+				spin.value_changed.connect(_on_noise_changed)
+				noise_grid.add_child(spin)
+			_noise_spins[part][channel] = {"wavelength": wavelength, "amplitude": amplitude}
+
+
+func _on_noise_changed(_value: float) -> void:
+	var data := {}
+	for part in _noise_spins:
+		data[part] = {}
+		for channel in _noise_spins[part]:
+			var spins: Dictionary = _noise_spins[part][channel]
+			data[part][channel] = {"wavelength": spins.wavelength.value, "amplitude": spins.amplitude.value}
+	dots.apply_noise(data)
+
+
 # ---------- Preview ----------
 
 func _on_dots_changed(_value: float) -> void:
@@ -173,6 +213,6 @@ func _layout_preview() -> void:
 # ---------- Saving ----------
 
 func _save() -> void:
-	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), ShapeView.save_size()]:
+	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ShapeView.save_size()]:
 		if result != OK:
 			push_error("Could not save config: %s" % error_string(result))
