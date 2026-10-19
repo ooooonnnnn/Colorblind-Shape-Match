@@ -1,12 +1,12 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://bktvhmad0cqu7"]
 
-[ext_resource type="Theme" path="res://ui_theme.tres" id="0_theme"]
-[ext_resource type="Script" path="res://scripts/menu.gd" id="1_menu"]
-[ext_resource type="Script" path="res://scripts/menu_decor.gd" id="2_decor"]
-[ext_resource type="Script" path="res://scripts/toy_button.gd" id="3_toy_button"]
-[ext_resource type="Script" path="res://scripts/credits.gd" id="4_credits"]
+[ext_resource type="Theme" uid="uid://b426jgoyfty6l" path="res://ui_theme.tres" id="0_theme"]
+[ext_resource type="Script" uid="uid://d2khs1tgy63t0" path="res://scripts/menu.gd" id="1_menu"]
+[ext_resource type="Script" uid="uid://cj7fqbdrrdb4c" path="res://scripts/menu_decor.gd" id="2_decor"]
+[ext_resource type="Script" uid="uid://ck28mptikwo1r" path="res://scripts/toy_button.gd" id="3_toy_button"]
+[ext_resource type="Script" uid="uid://c4ib3nq86tf5s" path="res://scripts/credits.gd" id="4_credits"]
 
-[node name="Menu" type="Control"]
+[node name="Menu" type="Control" unique_id=1410023092]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -16,7 +16,7 @@ grow_vertical = 2
 theme = ExtResource("0_theme")
 script = ExtResource("1_menu")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=238363659]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -26,7 +26,7 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.74902, 0.898039, 1, 1)
 
-[node name="Decor" type="Control" parent="." node_paths=PackedStringArray("target")]
+[node name="Decor" type="Control" parent="." unique_id=906591570 node_paths=PackedStringArray("target")]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -37,7 +37,7 @@ mouse_filter = 2
 script = ExtResource("2_decor")
 target = NodePath("../Center/Play")
 
-[node name="Center" type="VBoxContainer" parent="."]
+[node name="Center" type="VBoxContainer" parent="." unique_id=1439931043]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -48,7 +48,7 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 48
 
-[node name="Title" type="Label" parent="Center"]
+[node name="Title" type="Label" parent="Center" unique_id=692060439]
 layout_mode = 2
 theme_override_colors/font_outline_color = Color(1, 1, 1, 1)
 theme_override_constants/outline_size = 24
@@ -56,14 +56,14 @@ theme_override_font_sizes/font_size = 96
 text = "Shape Match"
 horizontal_alignment = 1
 
-[node name="Play" type="Button" parent="Center"]
+[node name="Play" type="Button" parent="Center" unique_id=1539695516]
 custom_minimum_size = Vector2(240, 240)
 layout_mode = 2
 size_flags_horizontal = 4
 script = ExtResource("3_toy_button")
 color = Color(0.482353, 0.847059, 0.560784, 1)
 
-[node name="Stats" type="Button" parent="."]
+[node name="Stats" type="Button" parent="." unique_id=1375951149]
 custom_minimum_size = Vector2(72, 72)
 layout_mode = 1
 anchors_preset = 3
@@ -83,7 +83,7 @@ picture = "chart"
 color = Color(0.878431, 0.878431, 0.941176, 1)
 hold_seconds = 2.0
 
-[node name="Config" type="Button" parent="."]
+[node name="Config" type="Button" parent="." unique_id=485033382]
 custom_minimum_size = Vector2(72, 72)
 layout_mode = 1
 anchors_preset = 3
@@ -103,18 +103,18 @@ picture = "gear"
 color = Color(0.878431, 0.878431, 0.941176, 1)
 hold_seconds = 2.0
 
-[node name="Credits" type="Label" parent="."]
+[node name="Credits" type="Label" parent="." unique_id=1512528594]
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 32.0
-offset_top = -64.0
-offset_right = 400.0
-offset_bottom = -32.0
+offset_left = 40.0
+offset_top = -84.0
+offset_right = 520.0
+offset_bottom = -36.0
 grow_vertical = 0
 theme_override_colors/font_color = Color(0.231373, 0.184314, 0.290196, 1)
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 28
 text = "MADE BY: CODE MORSE: 7493"
 vertical_alignment = 1
 script = ExtResource("4_credits")
