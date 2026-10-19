@@ -1,13 +1,15 @@
 extends CanvasLayer
 ## Redraws the area rectangle, except the mask rectangle, as non-overlapping
 ## circles. Each circle shows the background color, or a shape's color while
-## that shape's piece is under its center.
+## that shape's piece is under its center, with its hue, saturation and value
+## shifted by Perlin noise (see NOISE_PATH).
 ## The circles are packed once per area and mask position; which base color
 ## each one uses follows the screen live.
 
 signal colors_changed  ## a base color was edited, e.g. in the inspector while running
 
 const CONFIG_PATH := "res://dots.json"
+const NOISE_PATH := "res://noise.json"
 const MIN_RADIUS := 1.0     # px; spots that only fit a smaller circle are skipped
 const CELL := 4.0          # px; side of the cells used to track where free space is left
 
@@ -52,8 +54,10 @@ func _ready() -> void:
 	_circles.material = circle_material
 	_circles.multimesh = MultiMesh.new()
 	_circles.multimesh.transform_format = MultiMesh.TRANSFORM_2D
+	_circles.multimesh.use_custom_data = true
 	_circles.multimesh.mesh = quad
 	add_child(_circles)
+	_load_noise()
 
 
 func _load_config() -> void:
@@ -64,6 +68,29 @@ func _load_config() -> void:
 	max_radius = maxf(MIN_RADIUS, float(data.get("max_radius", max_radius)))
 	gap = maxf(0.0, float(data.get("gap", gap)))
 	fill = clampf(float(data.get("fill_percent", fill * 100)) / 100, 0.0, 1.0)
+
+
+## Gives the circle shader each H, S and V noise's wavelength and amplitude,
+## separately for the background and the shapes.
+func _load_noise() -> void:
+	var data = JSON.parse_string(FileAccess.get_file_as_string(NOISE_PATH))
+	if not data is Dictionary:
+		push_error("Bad or missing noise config in %s" % NOISE_PATH)
+		data = {}
+	for part in [["background", "background"], ["shapes", "shape"]]:
+		var channels = data.get(part[0])
+		if not channels is Dictionary:
+			channels = {}
+		var wavelength := Vector3.ONE
+		var amplitude := Vector3.ZERO
+		for i in 3:
+			var noise = channels.get(["hue", "saturation", "value"][i])
+			if not noise is Dictionary:
+				noise = {}
+			wavelength[i] = maxf(1.0, float(noise.get("wavelength", 1)))
+			amplitude[i] = float(noise.get("amplitude", 0))
+		_circles.material.set_shader_parameter(part[1] + "_wavelength", wavelength)
+		_circles.material.set_shader_parameter(part[1] + "_amplitude", amplitude)
 
 
 ## The color pieces of this shape are filled with, and the base for their circles.
@@ -185,3 +212,4 @@ func _show(circles: PackedVector3Array) -> void:
 	for i in circles.size():
 		var c := circles[i]
 		mm.set_instance_transform_2d(i, Transform2D(0, Vector2.ONE * c.z * 2, 0, Vector2(c.x, c.y)))
+		mm.set_instance_custom_data(i, Color(c.x, c.y, 0, 0))  # center, for the noise
