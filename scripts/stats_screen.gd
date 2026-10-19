@@ -20,6 +20,7 @@ const BASELINE_PLATE := {"background": Color("c9ccd3"), "colors": [Color("3b2f4a
 
 @onready var summary_label: Label = %Summary
 @onready var cards: VBoxContainer = %Cards
+@onready var export_button: Button = %Export
 @onready var clear: Button = %Clear
 @onready var back: ToyButton = %Back
 
@@ -32,8 +33,42 @@ func _ready() -> void:
 		await get_tree().create_timer(0.15).timeout  # let the button's pop play
 		get_tree().change_scene_to_file("res://menu.tscn")
 	)
+	export_button.pressed.connect(_on_export)
 	clear.pressed.connect(_on_clear)
 	_build()
+
+
+## Asks where to save all the records as a CSV file, with the system's own
+## save dialog where there is one (it is also the way to reach files on a tablet).
+func _on_export() -> void:
+	var dialog := FileDialog.new()
+	dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	dialog.access = FileDialog.ACCESS_FILESYSTEM
+	dialog.use_native_dialog = true
+	dialog.filters = PackedStringArray(["*.csv ; CSV files"])
+	dialog.current_dir = OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
+	dialog.current_file = "shape_match_stats_%s.csv" % Time.get_date_string_from_system()
+	dialog.file_selected.connect(_save_csv)
+	dialog.visibility_changed.connect(func():
+		if not dialog.visible:
+			dialog.queue_free()
+	)
+	add_child(dialog)
+	dialog.popup_centered_ratio(0.7)
+
+
+func _save_csv(path: String) -> void:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file:
+		file.store_string(Stats.to_csv(Stats.load_records(), Stats.load_sessions()))
+		file.close()
+	else:
+		push_error("Could not export stats to %s: %s" % [path, error_string(FileAccess.get_open_error())])
+	export_button.text = "Saved!" if file else "Couldn't save"
+	get_tree().create_timer(2.0).timeout.connect(func():
+		if is_instance_valid(export_button):
+			export_button.text = "Export CSV"
+	)
 
 
 func _on_clear() -> void:
