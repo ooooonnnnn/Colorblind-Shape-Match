@@ -2,6 +2,8 @@ extends Control
 
 const Dots := preload("res://scripts/dots.gd")
 const ColorGroups := preload("res://scripts/color_groups.gd")
+const Stats := preload("res://scripts/stats.gd")
+const MIN_LOOK_MS := 10000   # how long a level must have been up before leaving it counts its pieces as missed
 const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
 const SPACING := 16.0        # px of clear space between bounding circles at the start of a level
 const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tray edge
@@ -41,6 +43,14 @@ var transitioning := false
 var board_size := Vector2.ZERO  # the board's laid-out size, known before containers sort
 var _level_id := 0  # lets a pending level change notice it was superseded
 var _chime_step := 0  # rises with each placement, resets each level
+# Stats (see Stats): pieces finished this level, waiting to be saved, and the
+# moment the player was last free to look for a piece, so a piece's spot time
+# never includes time spent handling another one.
+var _session := int(Time.get_unix_time_from_system())
+var _level_group := ""  # the color group id, or Stats.BASELINE without the filter
+var _level_started_ms := 0
+var _search_from_ms := 0
+var _finished: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -161,6 +171,7 @@ func new_level() -> void:
 	effects.clear_star()
 	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups))
 	dots.show_group(group)
+	_level_group = group.id if config.filter else Stats.BASELINE
 	hole_count = config.holes
 	pieces_per_shape = config.shapes
 	level_time = config.duration
@@ -195,6 +206,8 @@ func new_level() -> void:
 		var p := ShapeView.new()
 		p.setup(shapes[i % hole_count], true)
 		p.set_meta("color", colors[i])
+		p.set_meta("spot_ms", -1)
+		p.set_meta("wrong", 0)
 		p.fill = dots.figure_color(colors[i])
 		p.target_hole = holes[i % hole_count]
 		p.home = piece_spots[i] / board_size
@@ -205,6 +218,8 @@ func new_level() -> void:
 
 	deadline_ms = Time.get_ticks_msec() + int(level_time * 1000)
 	transitioning = false
+	_level_started_ms = Time.get_ticks_msec()
+	_search_from_ms = _level_started_ms
 
 
 func _recolor_pieces() -> void:
@@ -237,6 +252,7 @@ func end_game() -> void:
 func end_level(cleared: bool) -> void:
 	transitioning = true
 	deselect()
+	_finish_level()
 	var delay := 1.2
 	if cleared:
 		delay = 1.8
@@ -258,6 +274,9 @@ func end_level(cleared: bool) -> void:
 
 
 func _go_home() -> void:
+	if not transitioning:
+		# Pieces left on a board that was barely up say nothing about seeing them.
+		_finish_level(Time.get_ticks_msec() - _level_started_ms >= MIN_LOOK_MS)
 	# A moment for the button's squish and pop before the scene goes.
 	await get_tree().create_timer(0.15).timeout
 	get_tree().change_scene_to_file("res://menu.tscn")
@@ -294,6 +313,8 @@ func place(p: ShapeView) -> void:
 			var rect := hole.get_global_rect()
 			effects.burst(rect.get_center(), rect.size.x * 0.5)
 	)
+	_finished.append(_record(p, "found"))
+	_resume_search()
 	pieces.erase(p)
 	if pieces.is_empty():
 		score += 1
@@ -311,6 +332,8 @@ func play_chime() -> void:
 
 
 func reject(p: ShapeView, _hole: ShapeView) -> void:
+	p.set_meta("wrong", p.get_meta("wrong") + 1)
+	_resume_search()
 	p.nod()
 	p.target_hole.bulge()
 	uh_uh.play()
@@ -332,6 +355,48 @@ func deselect() -> void:
 	selected = null
 
 
+# ---------- Stats ----------
+
+## The first time a piece is touched, the time since the player was last free
+## to look is its spot time. Touching it also ends the search, so switching to
+## another piece only counts the time since this one was found.
+func _spot(p: ShapeView) -> void:
+	var now := Time.get_ticks_msec()
+	if p.get_meta("spot_ms") < 0:
+		p.set_meta("spot_ms", now - _search_from_ms)
+	_search_from_ms = now
+
+
+## The player has let go of a piece (placed, sent back or put down) and is free
+## to look for the next one.
+func _resume_search() -> void:
+	_search_from_ms = Time.get_ticks_msec()
+
+
+func _record(p: ShapeView, outcome: String) -> Dictionary:
+	return {
+		"session": _session,
+		"level": level_num,
+		"group": _level_group,
+		"filter": _level_group != Stats.BASELINE,
+		"shape": p.shape_name,
+		"color": p.fill.to_html(false),
+		"outcome": outcome,
+		"spot_ms": p.get_meta("spot_ms"),
+		"wrong": p.get_meta("wrong"),
+	}
+
+
+## Saves the level's records, first recording the pieces still on the board as
+## seen (touched) or missed if count_left.
+func _finish_level(count_left := true) -> void:
+	if count_left:
+		for p in pieces:
+			_finished.append(_record(p, "seen" if p.get_meta("spot_ms") >= 0 else "missed"))
+	Stats.add(_finished)
+	_finished.clear()
+
+
 # ---------- Tap-tap ----------
 
 func tap_piece(p: ShapeView) -> void:
@@ -339,6 +404,7 @@ func tap_piece(p: ShapeView) -> void:
 		return
 	if selected == p:
 		deselect()
+		_resume_search()
 	else:
 		select(p)
 
@@ -378,12 +444,14 @@ func _on_piece_input(event: InputEvent, p: ShapeView) -> void:
 		p.accept_event()
 		if not (p.placed or transitioning):
 			_press_feedback(p)
+			_spot(p)
 		tap_piece(p)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		p.accept_event()
 		if event.pressed:
 			if not (p.placed or transitioning or drag):
 				_press_feedback(p)
+				_spot(p)
 				drag = {"p": p, "start": event.global_position, "origin": p.norm_pos, "moved": false}
 		elif drag and drag.p == p:
 			_end_drag()
@@ -427,6 +495,7 @@ func _end_drag() -> void:
 
 	if not target:
 		p.move_to(p.home)
+		_resume_search()
 	elif target == p.target_hole:
 		place(p)
 	else:
