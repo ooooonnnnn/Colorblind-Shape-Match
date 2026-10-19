@@ -1,6 +1,4 @@
-func get_random_background_color() -> Color:
-	var base_color = Color("2ecc71") # ירוק בסיס
-	
+static func get_random_background_color(base_color: Color) -> Color:
 	# מגריל את הבהירות (Value) בין חשוך למואר
 	var random_v = randf_range(0.3, 0.9) 
 	# מגריל את הרוויה (Saturation) בין דהוי לרווי

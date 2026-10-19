@@ -17,6 +17,10 @@ var radius := 0.0  # bounding circle around the center, as a fraction of the sid
 
 # Pieces only.
 var target_hole: ShapeView
+var fill := PIECE_FILL:
+	set(v):
+		fill = v
+		queue_redraw()
 var home := Vector2.ZERO
 var placed := false:
 	set(v):
@@ -168,8 +172,8 @@ func _draw() -> void:
 		draw_polyline(outline, Color(ACCENT, 0.6), 6.0, true)
 
 	if is_piece:
-		draw_colored_polygon(_points, PIECE_FILL)
-		draw_polyline(outline, PIECE_FILL if placed else PIECE_EDGE, 2.0, true)
+		draw_colored_polygon(_points, fill)
+		draw_polyline(outline, fill if placed else PIECE_EDGE, 2.0, true)
 	else:
 		draw_colored_polygon(_points, HOLE_FILL)
 		draw_polyline(outline, HOLE_EDGE, 2.5, true)

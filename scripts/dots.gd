@@ -1,13 +1,29 @@
 extends CanvasLayer
-## Redraws the whole screen, except the mask rectangle, as non-overlapping
-## circles that each take the color under their center. The circles are packed
-## once per screen size and mask position; their colors follow the screen live.
+## Redraws the area rectangle, except the mask rectangle, as non-overlapping
+## circles. Each circle gets a random shade (from ArtManager) of the background
+## color, or of a shape's color while that shape's piece is under its center.
+## The circles are packed once per area and mask position; which base color
+## each one uses follows the screen live.
 
+signal colors_changed  ## a base color was edited, e.g. in the inspector while running
+
+const ArtManager := preload("res://scripts/ArtManager.gd")
 const CONFIG_PATH := "res://dots.json"
 const MIN_RADIUS := 1.0     # px; spots that only fit a smaller circle are skipped
 const CELL := 4.0          # px; side of the cells used to track where free space is left
+const SHADE_COLUMNS := 2048  # circles per row of the shade texture; must match dot_circle.gdshader
 
+@export var area: Control  ## the part of the screen the circles fill
 @export var mask: Control  ## stays clear of circles
+
+@export_group("Colors")
+@export var background_color := Color("2ecc71")
+@export var square_color := Color("e74c3c")
+@export var circle_color := Color("e67e22")
+@export var triangle_color := Color("f1c40f")
+@export var star_color := Color("3498db")
+@export var kite_color := Color("9b59b6")
+@export var crescent_color := Color("e84393")
 
 var max_radius := 14.0  # px
 var gap := 3.0          # px between neighbouring circles
@@ -15,8 +31,9 @@ var fill := 0.5         # fraction of the area outside the mask to cover
 
 var _background := ColorRect.new()
 var _circles := MultiMeshInstance2D.new()
+var _packed_in := Rect2()   # the area rect the circles were packed into
 var _packed_for := Rect2()  # the mask rect the circles were packed around
-var _packed_size := Vector2.ZERO
+var _shaded_for := PackedColorArray()  # the base colors the shades were picked from
 
 
 func _ready() -> void:
@@ -51,18 +68,41 @@ func _load_config() -> void:
 	fill = clampf(float(data.get("fill_percent", fill * 100)) / 100, 0.0, 1.0)
 
 
+## The color pieces of this shape are filled with, and the base for their circles.
+func shape_color(shape_name: String) -> Color:
+	return get(shape_name + "_color")
+
+
+## The background color, then each shape's color in Shapes.NAMES order.
+func _base_colors() -> PackedColorArray:
+	var colors := PackedColorArray([background_color])
+	for shape_name in Shapes.NAMES:
+		colors.append(shape_color(shape_name))
+	return colors
+
+
 func _process(_delta: float) -> void:
-	var screen := get_viewport().get_visible_rect().size
+	if _base_colors() != _shaded_for:
+		_shade(_circles.multimesh.instance_count)
+		colors_changed.emit()
+	var area_rect := area.get_global_rect() if area else get_viewport().get_visible_rect()
 	var mask_rect := mask.get_global_rect() if mask else Rect2()
-	if screen == _packed_size and mask_rect == _packed_for:
+	if area_rect == _packed_in and mask_rect == _packed_for:
 		return
-	_packed_size = screen
+	_packed_in = area_rect
 	_packed_for = mask_rect
-	_background.size = screen
+	var size := area_rect.size
+	# From here on both are relative to the area's top-left corner.
+	mask_rect = Rect2(mask_rect.position - area_rect.position, mask_rect.size).intersection(Rect2(Vector2.ZERO, size))
+	_background.position = area_rect.position
+	_background.size = size
 	_background.material.set_shader_parameter("mask_rect",
-			Vector4(mask_rect.position.x / screen.x, mask_rect.position.y / screen.y,
-					mask_rect.size.x / screen.x, mask_rect.size.y / screen.y))
-	_show(_pack(screen, mask_rect))
+			Vector4(mask_rect.position.x / size.x, mask_rect.position.y / size.y,
+					mask_rect.size.x / size.x, mask_rect.size.y / size.y))
+	_circles.position = area_rect.position
+	var circles := _pack(size, mask_rect)
+	_show(circles)
+	_shade(circles.size())
 
 
 ## Circles as (x, y, radius), placed one at a time at random free spots, each
@@ -128,7 +168,7 @@ func _pack(screen: Vector2, mask_rect: Rect2) -> PackedVector3Array:
 					_take(cell, free, slot)
 
 	if covered < target:
-		push_warning("Dots covered %d%% of the screen, short of %d%%" % [roundi(covered / valid_area * 100), roundi(fill * 100)])
+		push_warning("Dots covered %d%% of the area, short of %d%%" % [roundi(covered / valid_area * 100), roundi(fill * 100)])
 	return circles
 
 
@@ -140,6 +180,19 @@ func _take(id: int, free: PackedInt32Array, slot: PackedInt32Array) -> void:
 	slot[last] = i
 	free.resize(free.size() - 1)
 	slot[id] = -1
+
+
+## Picks every circle's shade of every base color, and gives the shader the
+## bases so it can tell which shape, if any, is under a circle.
+func _shade(count: int) -> void:
+	var bases := _base_colors()
+	_shaded_for = bases
+	var image := Image.create_empty(SHADE_COLUMNS * bases.size(), maxi(1, ceili(count / float(SHADE_COLUMNS))), false, Image.FORMAT_RGBA8)
+	for i in count:
+		for j in bases.size():
+			image.set_pixel((i % SHADE_COLUMNS) * bases.size() + j, i / SHADE_COLUMNS, ArtManager.get_random_background_color(bases[j]))
+	_circles.material.set_shader_parameter("shades", ImageTexture.create_from_image(image))
+	_circles.material.set_shader_parameter("bases", bases)
 
 
 func _show(circles: PackedVector3Array) -> void:

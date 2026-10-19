@@ -1,5 +1,6 @@
 extends Control
 
+const Dots := preload("res://scripts/dots.gd")
 const CONFIG_PATH := "res://config.json"
 const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
 const SPACING := 16.0        # px of clear space between bounding circles at the start of a level
@@ -17,6 +18,7 @@ const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 @onready var toast_label: Label = $Content/Board/Toast/Label
 @onready var uh_uh: AudioStreamPlayer = $UhUh
 @onready var chime: AudioStreamPlayer = $Chime
+@onready var dots: Dots = $Dots
 
 var levels: Array[Dictionary] = []  # entries from CONFIG_PATH
 var hole_count := 0
@@ -38,6 +40,7 @@ var _chime_step := 0  # rises with each placement, resets each level
 
 func _ready() -> void:
 	_load_levels()
+	dots.colors_changed.connect(_recolor_pieces)
 	resized.connect(_layout)
 	_layout()
 	new_level()
@@ -191,6 +194,7 @@ func new_level() -> void:
 	for i in piece_radii.size():
 		var p := ShapeView.new()
 		p.setup(shapes[i % hole_count], true)
+		p.fill = dots.shape_color(p.shape_name)
 		p.target_hole = holes[i % hole_count]
 		p.home = piece_spots[i] / board_size
 		p.norm_pos = p.home
@@ -200,6 +204,11 @@ func new_level() -> void:
 
 	deadline_ms = Time.get_ticks_msec() + int(level_time * 1000)
 	transitioning = false
+
+
+func _recolor_pieces() -> void:
+	for p in pieces:
+		p.fill = dots.shape_color(p.shape_name)
 
 
 func _clear_board() -> void:

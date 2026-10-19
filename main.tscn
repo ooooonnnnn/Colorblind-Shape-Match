@@ -135,6 +135,7 @@ stream = ExtResource("4_uh_uh")
 [node name="Chime" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("5_chime")
 
-[node name="Dots" type="CanvasLayer" parent="." node_paths=PackedStringArray("mask")]
+[node name="Dots" type="CanvasLayer" parent="." node_paths=PackedStringArray("area", "mask")]
 script = ExtResource("6_dots")
+area = NodePath("../Content/Board")
 mask = NodePath("../Content/Board/Tray")
