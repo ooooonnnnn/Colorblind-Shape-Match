@@ -1,9 +1,10 @@
 extends Control
-## Title screen: a big play button for the child, and a chart and a gear for
-## grown-ups that only open the stats and config scenes after being held down
-## (see ToyButton).
+## Title screen: a big play button for the child, and a magnifying glass, a
+## chart and a gear for grown-ups that only open the references, stats and
+## config scenes after being held down (see ToyButton).
 
 @onready var play: ToyButton = $Center/Play
+@onready var references: ToyButton = $References
 @onready var stats: ToyButton = $Stats
 @onready var config: ToyButton = $Config
 @onready var decor: Control = $Decor
@@ -11,6 +12,7 @@ extends Control
 
 func _ready() -> void:
 	play.activated.connect(_open.bind("res://main.tscn"))
+	references.activated.connect(_open.bind("res://references.tscn"))
 	stats.activated.connect(_open.bind("res://stats.tscn"))
 	config.activated.connect(_open.bind("res://config.tscn"))
 	decor.matched.connect(_on_triangle_fitted)

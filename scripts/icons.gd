@@ -42,6 +42,14 @@ static func _parts(icon: String, side: float) -> Array[PackedVector2Array]:
 			return [Transform2D(PI / 4, Vector2.ZERO) * _scaled(PLUS, h)]
 		"check":
 			return [_scaled([[-0.8, 0.0], [-0.5, -0.3], [-0.2, 0.0], [0.5, -0.7], [0.8, -0.4], [-0.2, 0.6]], h)]
+		"magnifier":
+			# A lens up and to the left, with a rim, and a handle down to the right.
+			var lens := Vector2(-0.18, -0.18) * h
+			var along := Vector2(1, 1).normalized()
+			var across := Vector2(-along.y, along.x) * h * 0.14
+			var handle := PackedVector2Array([lens + along * h * 0.5 + across, lens + along * h * 1.3 + across,
+					lens + along * h * 1.3 - across, lens + along * h * 0.5 - across])
+			return [handle, Transform2D(0, lens) * _circle(h * 0.62), Transform2D(0, lens) * _circle(h * 0.44)]
 		"gear":
 			var gear := PackedVector2Array()
 			for i in 32:

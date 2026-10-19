@@ -63,6 +63,20 @@ size_flags_horizontal = 4
 script = ExtResource("3_toy_button")
 color = Color(0.482353, 0.847059, 0.560784, 1)
 
+[node name="References" type="Button" parent="."]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 0
+offset_left = 32.0
+offset_top = 32.0
+offset_right = 104.0
+offset_bottom = 104.0
+focus_mode = 0
+tooltip_text = "References"
+script = ExtResource("3_toy_button")
+picture = "magnifier"
+color = Color(0.878431, 0.878431, 0.941176, 1)
+hold_seconds = 2.0
+
 [node name="Stats" type="Button" parent="." unique_id=1375951149]
 custom_minimum_size = Vector2(72, 72)
 layout_mode = 1

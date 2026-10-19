@@ -1,0 +1,83 @@
+[gd_scene format=3]
+
+[ext_resource type="Theme" path="res://ui_theme.tres" id="0_theme"]
+[ext_resource type="Script" path="res://scripts/references_screen.gd" id="1_references"]
+[ext_resource type="Script" path="res://scripts/toy_button.gd" id="2_toy_button"]
+
+[node name="References" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("0_theme")
+script = ExtResource("1_references")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.74902, 0.898039, 1, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="Rows" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Header" type="HBoxContainer" parent="Margin/Rows"]
+custom_minimum_size = Vector2(0, 72)
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Back" type="Button" parent="Margin/Rows/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+tooltip_text = "Back to the menu"
+script = ExtResource("2_toy_button")
+picture = "house"
+color = Color(1, 0.705882, 0.635294, 1)
+
+[node name="Titles" type="VBoxContainer" parent="Margin/Rows/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="Title" type="Label" parent="Margin/Rows/Header/Titles"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(1, 1, 1, 1)
+theme_override_constants/outline_size = 14
+theme_override_font_sizes/font_size = 40
+text = "References"
+
+[node name="Summary" type="Label" parent="Margin/Rows/Header/Titles"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.231373, 0.184314, 0.290196, 0.7)
+text = "The research the game is based on. Tap a link to open it."
+
+[node name="Scroll" type="ScrollContainer" parent="Margin/Rows"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Cards" type="VBoxContainer" parent="Margin/Rows/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 16
