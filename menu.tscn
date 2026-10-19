@@ -1,16 +1,10 @@
 [gd_scene format=3]
 
+[ext_resource type="Theme" path="res://ui_theme.tres" id="0_theme"]
 [ext_resource type="Script" path="res://scripts/menu.gd" id="1_menu"]
 [ext_resource type="Script" path="res://scripts/menu_decor.gd" id="2_decor"]
 [ext_resource type="Script" path="res://scripts/toy_button.gd" id="3_toy_button"]
-
-[sub_resource type="SystemFont" id="Font_round"]
-font_names = PackedStringArray("Arial Rounded MT Bold", "Comic Sans MS", "Sans-Serif")
-
-[sub_resource type="Theme" id="Theme_ui"]
-default_font = SubResource("Font_round")
-default_font_size = 16
-Label/colors/font_color = Color(0.231373, 0.184314, 0.290196, 1)
+[ext_resource type="Script" path="res://scripts/credits.gd" id="4_credits"]
 
 [node name="Menu" type="Control"]
 layout_mode = 3
@@ -19,7 +13,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme = SubResource("Theme_ui")
+theme = ExtResource("0_theme")
 script = ExtResource("1_menu")
 
 [node name="Background" type="ColorRect" parent="."]
@@ -87,3 +81,19 @@ script = ExtResource("3_toy_button")
 picture = "gear"
 color = Color(0.878431, 0.878431, 0.941176, 1)
 hold_seconds = 2.0
+
+[node name="Credits" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 32.0
+offset_top = -64.0
+offset_right = 400.0
+offset_bottom = -32.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.231373, 0.184314, 0.290196, 0.75)
+theme_override_font_sizes/font_size = 20
+text = "MADE BY: CODE MORSE: 7493"
+vertical_alignment = 1
+script = ExtResource("4_credits")

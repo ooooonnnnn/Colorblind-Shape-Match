@@ -13,6 +13,7 @@ const NOISE_PATH := "res://noise.json"
 const ColorGroups := preload("res://scripts/color_groups.gd")
 const MIN_RADIUS := 1.0     # px; spots that only fit a smaller circle are skipped
 const CELL := 4.0          # px; side of the cells used to track where free space is left
+const PAPER := Color("f7f1e3")  # shows between the circles, like the paper of a printed plate
 const NOISE_PARTS := {"background": "background", "shapes": "shape"}  # NOISE_PATH key: shader uniform prefix
 const NOISE_CHANNELS := ["hue", "saturation", "value"]
 
@@ -43,7 +44,7 @@ func _ready() -> void:
 
 	var bg_material := ShaderMaterial.new()
 	bg_material.shader = preload("res://shaders/dot_background.gdshader")
-	bg_material.set_shader_parameter("background", ProjectSettings.get_setting("rendering/environment/defaults/default_clear_color"))
+	bg_material.set_shader_parameter("background", PAPER)
 	_background.material = bg_material
 	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_background)
