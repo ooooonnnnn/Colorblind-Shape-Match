@@ -5,6 +5,10 @@ const ColorGroups := preload("res://scripts/color_groups.gd")
 const Stats := preload("res://scripts/stats.gd")
 const MIN_LOOK_MS := 10000   # how long a level must have been up before leaving it counts its pieces as missed
 const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
+const GLIDE_RATE := 14.0     # how fast a dragged piece catches up with the finger, per second; lower trails more
+const LEAN_MAX := 12.0       # degrees a dragged piece leans into its motion at most
+const LEAN_SPEED := 1200.0   # px/s of sideways motion that gives the full lean
+const LEAN_RATE := 10.0      # how fast the lean follows changes in motion, per second
 const SPACING := 16.0        # px of clear space between bounding circles at the start of a level
 const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tray edge
 const EDGE_GROWTH := 1.2     # pieces swell up to this when pressed, squished or picked up
@@ -196,7 +200,8 @@ func new_level() -> void:
 	for i in hole_count * pieces_per_shape:
 		piece_radii.append(hole_radii[i % hole_count] + outline_reach)
 	var hole_spots := _hole_row(hole_radii, hole_radii.max() * 2)
-	var tray_rect := _bounds(hole_spots, hole_radii).grow(TRAY_PADDING)
+	# Holes are drawn as big as a piece's outer edge, so the tray leaves room for that.
+	var tray_rect := _bounds(hole_spots, hole_radii).grow(outline_reach + TRAY_PADDING)
 	_place_tray(tray_rect)
 	var piece_spots := _scatter_pieces(piece_radii, tray_rect)
 
@@ -289,7 +294,18 @@ func _go_home() -> void:
 	get_tree().change_scene_to_file("res://menu.tscn")
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	# A dragged piece glides after the finger instead of sticking to it.
+	# It also leans into its motion, like something carried, tipping toward the
+	# side it moves to.
+	if drag and drag.moved:
+		var p: ShapeView = drag.p
+		var was := p.norm_pos
+		p.move_to(p.norm_pos.lerp(drag.target, 1.0 - exp(-GLIDE_RATE * delta)), false)
+		if delta > 0:
+			var sideways := (p.norm_pos.x - was.x) * board.size.x / delta
+			var lean := deg_to_rad(LEAN_MAX) * clampf(sideways / LEAN_SPEED, -1.0, 1.0)
+			p.tilt = lerpf(p.tilt, lean, 1.0 - exp(-LEAN_RATE * delta))
 	if level_time <= 0:
 		timer_bar.ratio = 1.0
 		timer_bar.low = false
@@ -312,11 +328,11 @@ func place(p: ShapeView) -> void:
 	p.vanish_into(p.target_hole.norm_pos)
 	play_chime()
 	pips.add_one()
-	# The hole gulps the piece down with a sparkle as it arrives.
+	# The hole pulses with a sparkle as the piece arrives.
 	var hole := p.target_hole
 	get_tree().create_timer(0.2).timeout.connect(func():
 		if is_instance_valid(hole):
-			hole.squish(0.25)
+			hole.pulse()
 			var rect := hole.get_global_rect()
 			effects.burst(rect.get_center(), rect.size.x * 0.5)
 	)
@@ -475,18 +491,21 @@ func _on_piece_input(event: InputEvent, p: ShapeView) -> void:
 			p.z_index = 3
 			p.scale_to(1.08)
 		if drag.moved:
-			p.move_to(drag.origin + delta / board.size, false)
+			drag.target = drag.origin + delta / board.size  # _process glides the piece there
 
 
 func _end_drag() -> void:
 	var p: ShapeView = drag.p
 	var moved: bool = drag.moved
+	# Where the finger let go, which the gliding piece may not have reached yet.
+	var drop: Vector2 = drag.get("target", p.norm_pos)
 	drag = {}
 	if not moved:
 		tap_piece(p)
 		return
 
 	p.dragging = false
+	p.level_tilt()
 	effects.glow(null)
 	p.z_index = 2
 	p.scale_to(1.0)
@@ -499,7 +518,7 @@ func _end_drag() -> void:
 	var side := ShapeView.side_for(board.size)
 	var target: ShapeView = null
 	for hole in holes:
-		var dist := ((hole.norm_pos - p.norm_pos) * board.size).length()
+		var dist := ((hole.norm_pos - drop) * board.size).length()
 		if dist <= (hole.radius + p.radius) * side:
 			target = hole
 			break

@@ -372,8 +372,9 @@ func _on_size_changed() -> void:
 
 func _on_outline_changed() -> void:
 	ShapeView.outline_percent = _outline_slider.value
-	for piece in _pieces:
-		piece.queue_redraw()
+	for view in _holes + _pieces:
+		view.queue_redraw()
+	_layout_preview()  # holes grow with the outline, and the tray with them
 
 
 # ---------- Color groups ----------
@@ -656,7 +657,7 @@ func _layout_preview() -> void:
 		var x := first_x + step * (i % _holes.size())
 		_pieces[i].norm_pos = Vector2(x, board.y * (0.6 + 0.22 * (i / _holes.size()))) / board
 	var row := Rect2(first_x - side / 2, holes_y - side / 2, step * _holes.size() - PREVIEW_SPACING, side)
-	var tray_rect := row.grow(TRAY_PADDING)
+	var tray_rect := row.grow(side * ShapeView.outline_percent / 200 + TRAY_PADDING)  # holes reach out to a piece's outer edge
 	tray.position = tray_rect.position
 	tray.size = tray_rect.size
 

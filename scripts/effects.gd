@@ -6,9 +6,10 @@ extends CanvasLayer
 
 const COLORS := [Color("ffd166"), Color("ff8fab"), Color("8fd3ff"), Color("b8f2a6"), Color("cdb4ff"), Color.WHITE]
 const GRAVITY := 900.0  # px/s², confetti only
-const GLOW_REACH := 22.0  # how far the glow fades out past a piece's outline, in 100x100 box units
-const GLOW_COLOR := Color(0.75, 0.88, 1.0)  # white with a touch of blue
-const GLOW_BANDS := 8
+const GLOW_REACH := 24.0  # how far the glow fades out past a piece's outline, in 100x100 box units
+const GLOW_COLOR := Color(1.0, 0.93, 0.62)  # warm golden white, bright on the blue-gray board and the dots
+const GLOW_STRENGTH := 0.4  # opacity right at the outline
+const GLOW_BANDS := 24
 
 ## Each: {pos, vel, spin, angle, size, color, life, age, star, falls}
 var _particles: Array[Dictionary] = []
@@ -87,7 +88,7 @@ func cheer(center: Vector2, side: float, hold := 1.0, stay := false) -> void:
 		_star_tween.tween_callback(clear_star)
 
 
-## A faint bluish-white glow hugging a picked-up piece, so it is easy to keep track
+## A warm golden glow hugging a picked-up piece, so it is easy to keep track
 ## of. It starts just outside the piece's outline, so the dots that draw the
 ## piece stay uncovered.
 func glow(view: ShapeView) -> void:
@@ -132,7 +133,8 @@ func _draw_particles() -> void:
 		for i in GLOW_BANDS:
 			var f := float(i) / GLOW_BANDS
 			for loop in _glowing.outline_around(ShapeView.outline_percent / 2 + band * (i + 0.5)):
-				_canvas.draw_polyline(loop, Color(GLOW_COLOR, 0.42 * (1.0 - f) * (1.0 - f)), band * px + 1.0, true)
+				# A bell-shaped fade, so the glow melts into the board with no edge.
+				_canvas.draw_polyline(loop, Color(GLOW_COLOR, GLOW_STRENGTH * exp(-5.0 * f * f)), band * px + 0.5, true)
 	for p in _particles:
 		var fade := clampf((p.life - p.age) / 0.3, 0.0, 1.0)
 		var color: Color = p.color

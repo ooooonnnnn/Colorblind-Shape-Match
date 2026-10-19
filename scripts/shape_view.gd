@@ -184,6 +184,23 @@ func nod() -> void:
 		_tilt_tween.tween_property(self, "tilt", deg_to_rad(deg), 0.09)
 
 
+## Ease back upright, as when let go after leaning into a drag.
+func level_tilt() -> void:
+	if _tilt_tween:
+		_tilt_tween.kill()
+	_tilt_tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tilt_tween.tween_property(self, "tilt", 0.0, 0.3)
+
+
+## One soft, even swell and back, as when a hole takes in its piece.
+func pulse() -> void:
+	if _scale_tween:
+		_scale_tween.kill()
+	_scale_tween = create_tween().set_trans(Tween.TRANS_SINE)
+	_scale_tween.tween_property(self, "visual_scale", 1.12, 0.12).set_ease(Tween.EASE_OUT)
+	_scale_tween.tween_property(self, "visual_scale", 1.0, 0.24).set_ease(Tween.EASE_IN_OUT)
+
+
 # Swell briefly to point itself out.
 func bulge() -> void:
 	if _scale_tween:
@@ -199,7 +216,7 @@ func bulge() -> void:
 func squish(amount := 0.18) -> void:
 	if _squash_tween:
 		_squash_tween.kill()
-	_squash_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_squash_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_squash_tween.tween_property(self, "squash", amount, 0.06)
 	_squash_tween.tween_property(self, "squash", -amount * 0.6, 0.1)
 	_squash_tween.tween_property(self, "squash", amount * 0.25, 0.1)
@@ -212,10 +229,16 @@ func _on_focus_entered() -> void:
 	queue_redraw()
 
 
-## A closed outline outline_percent wide, with rounded corners so sharp points
-## like the star's stay joined.
+## A closed outline outline_percent wide with round corners. The sides are
+## separate segments, since a connected thick line gets mitered spikes at sharp
+## points; this way the outer edge is exactly the outline grown by half the
+## width with round joins, which is what outline_around and the glow follow.
 func _draw_hollow(outline: PackedVector2Array, color: Color) -> void:
-	draw_polyline(outline, color, outline_percent, true)
+	var sides := PackedVector2Array()
+	for i in outline.size() - 1:
+		sides.append(outline[i])
+		sides.append(outline[i + 1])
+	draw_multiline(sides, color, outline_percent, true)
 	for v in outline:
 		draw_circle(v, outline_percent / 2, color)
 
@@ -240,16 +263,10 @@ func _shape_transform() -> Transform2D:
 func _draw() -> void:
 	if _points.is_empty():
 		return
-	var k := size.x / 100.0
 	draw_set_transform_matrix(_shape_transform())
 	var outline := _points.duplicate()
 	outline.append(_points[0])
 
-	if dragging:
-		var shadow := PackedVector2Array()
-		for v in outline:
-			shadow.append(v + Vector2(0, 6.0 / k))
-		_draw_hollow(shadow, Color(0, 0, 0, 0.35))
 	if selected:
 		draw_polyline(outline, Color(ACCENT, 0.25), 12.0, true)
 		draw_polyline(outline, Color(ACCENT, 0.6), 6.0, true)
@@ -257,7 +274,10 @@ func _draw() -> void:
 	if is_piece:
 		_draw_hollow(outline, fill)
 	else:
-		draw_colored_polygon(_points, HOLE_FILL)
+		# The piece's outer edge: its outline grown by half the outline width with
+		# round corners, so a piece fits its hole exactly, corners and all.
+		for silhouette in Geometry2D.offset_polygon(_points, outline_percent / 2, Geometry2D.JOIN_ROUND):
+			draw_colored_polygon(silhouette, HOLE_FILL)
 
 	draw_set_transform(Vector2.ZERO)
 	if has_focus() and _show_focus:
