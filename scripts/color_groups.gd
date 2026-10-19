@@ -1,114 +1,104 @@
 extends RefCounted
-## Color groups: a background color plus a few shapes, each with its own color,
-## designed together so the shapes vanish into the background for one kind of
-## color vision deficiency. ARTICLE holds the groups taken from the research
-## articles; color_groups.json picks whether those or custom colors are used,
-## and which group is played.
+## Color groups, one per type of color vision deficiency: a background color and
+## a palette of figure colors that all fall on that type's confusion lines, so
+## pieces in any of them vanish into the background for that type. Pieces take
+## colors from the palette, more of it the more pieces a level has (see
+## piece_colors). ARTICLE holds the groups taken from the research articles and
+## never changes; color_groups.json holds whether those or the player's own copy
+## (recolored, with colors added or removed, or groups deleted) is used, and
+## which group is played.
 ##
 ## Sources: "Advanced Colorimetry Protocols and Design in Color Vision
-## Deficiency Diagnosis for Children Using Pseudoisochromatic Plates" (color
-## pairs, shapes) and "Comprehensive Research Report on Color Vision
+## Deficiency Diagnosis for Children Using Pseudoisochromatic Plates" (confusion
+## colors, backgrounds) and "Comprehensive Research Report on Color Vision
 ## Deficiencies" (prevalence). Each group's colors share one CIELAB lightness,
-## so no shape stands out by brightness alone, as the first article requires.
+## so no piece stands out by brightness alone, as the first article requires.
 
 const PATH := "res://color_groups.json"
 const RANDOM := "random"  # the play setting that picks a new group every level
+const MAX_COLORS := 6  # figure colors per group; must match BASE_COUNT - 1 in dot_circle.gdshader
+const LIGHTNESS_TOLERANCE := 5.0  # CIELAB L* a color may differ from its background before it shows by brightness
 
 const ARTICLE := [
 	{
-		"id": "red_green",
-		"name": "Red-green screening",
-		"about": "Ishihara / CVTME vanishing plates: red, orange and red-purple on yellow-green to blue-green. Protan and deutan, ~8% of males, ~0.5% of females.",
-		"background": Color("519b5c"),
-		"shapes": {"circle": Color("e0655e"), "star": Color("ca7737"), "square": Color("cd6b9a")},
+		"id": "protan",
+		"name": "Protan",
+		"kind": "Red-weak (L-cones)",
+		"prevalence": "~2% of males",
+		"about": "Reds, oranges and purple-magenta on yellow-green: protans confuse red with yellow-green, and purple-magenta lies on the protan line (Ishihara plates 26/27). Protanomaly ~1% and protanopia ~1% of males.",
+		"background": Color("7c9449"),
+		"colors": [Color("e0655e"), Color("d76d49"), Color("c47a3e"), Color("bc72b3"), Color("d1689b")],
 	},
 	{
-		"id": "transformation",
-		"name": "Transformation",
-		"about": "Inverted plates: unsaturated blue-green and yellow-green on red-orange. Protan and deutan, ~8% of males, ~0.5% of females.",
-		"background": Color("d76d49"),
-		"shapes": {"circle": Color("389a94"), "star": Color("859153"), "square": Color("389a94")},
+		"id": "deutan",
+		"name": "Deutan",
+		"kind": "Green-weak (M-cones)",
+		"prevalence": "~6% of males, the most common",
+		"about": "Red, magenta, purple and pink on green: deutans confuse green with purple-magenta, and red lies on the deutan line (Ishihara plates 26/27, HRR green/magenta). Deuteranomaly ~5% and deuteranopia ~1% of males.",
+		"background": Color("489b6d"),
+		"colors": [Color("e0655e"), Color("bc72b3"), Color("9e7ec1"), Color("d36a8d"), Color("d76d49")],
 	},
 	{
-		"id": "protan_deutan",
-		"name": "Protan vs deutan",
-		"about": "Ishihara plates 26/27: purple-magenta (protan line) and red (deutan line) on neutral gray. Protan ~2%, deutan ~6% of males.",
+		"id": "tritan",
+		"name": "Tritan",
+		"kind": "Blue-weak (S-cones)",
+		"prevalence": "under 0.01%, males and females alike",
+		"about": "Blues, violets and yellows on neutral gray: tritans confuse blue, yellow and purple, and HRR tritan plates put blue-purple and yellow-green across the gray point.",
 		"background": Color("8b8b8b"),
-		"shapes": {"circle": Color("ab79b9"), "star": Color("cc726a"), "square": Color("ab79b9")},
-	},
-	{
-		"id": "hrr_protan",
-		"name": "HRR protan",
-		"about": "HRR: unsaturated red and cyan on neutral gray. Protan, ~2% of males.",
-		"background": Color("919191"),
-		"shapes": {"circle": Color("c57e7c"), "triangle": Color("4e9d9f"), "square": Color("c57e7c")},
-	},
-	{
-		"id": "hrr_deutan",
-		"name": "HRR deutan",
-		"about": "HRR: green and magenta on neutral gray. Deutan, ~6% of males (the most common deficiency).",
-		"background": Color("919191"),
-		"shapes": {"circle": Color("729b6e"), "triangle": Color("b281ab"), "square": Color("729b6e")},
-	},
-	{
-		"id": "hrr_tritan",
-		"name": "HRR tritan",
-		"about": "HRR: blue-purple and yellow-green on neutral gray. Tritan, under 0.01%, males and females alike.",
-		"background": Color("919191"),
-		"shapes": {"circle": Color("8e8bc0"), "triangle": Color("91945e"), "square": Color("8e8bc0")},
+		"colors": [Color("8785c3"), Color("a27eb7"), Color("608fbf"), Color("8b9051"), Color("9d8a4d")],
 	},
 ]
 
 
-static func article_group(id: String) -> Dictionary:
-	for group in ARTICLE:
-		if group.id == id:
-			return group
-	return ARTICLE[0]
+## A fresh copy of the article groups, for the player to edit.
+static func article_copy() -> Array:
+	return ARTICLE.duplicate(true)
 
 
-## {custom: bool, play: group id or RANDOM, colors: {id: {background, shapes}}}.
-## colors holds the custom colors, filled in from ARTICLE where the file has none.
+## {custom: bool, play: group id or RANDOM, groups: the player's own groups,
+## each like an ARTICLE entry}.
 static func load_settings() -> Dictionary:
 	var data = JSON.parse_string(FileAccess.get_file_as_string(PATH)) if FileAccess.file_exists(PATH) else {}
 	if not data is Dictionary:
 		push_error("Bad color group config in %s" % PATH)
 		data = {}
-	var saved = data.get("custom_colors")
-	if not saved is Dictionary:
-		saved = {}
-	var colors := {}
-	for group in ARTICLE:
-		var entry = saved.get(group.id)
-		if not entry is Dictionary:
-			entry = {}
-		var shapes = entry.get("shapes")
-		if not shapes is Dictionary:
-			shapes = {}
-		colors[group.id] = {
-			"background": Color.from_string(str(entry.get("background", "")), group.background),
-			"shapes": {},
-		}
-		for shape_name in group.shapes:
-			colors[group.id].shapes[shape_name] = Color.from_string(str(shapes.get(shape_name, "")), group.shapes[shape_name])
-	var play := str(data.get("play", ARTICLE[0].id))
-	if play != RANDOM and article_group(play).id != play:
-		play = ARTICLE[0].id
-	return {"custom": data.get("mode") == "custom", "play": play, "colors": colors}
+	var groups := []
+	var saved = data.get("custom_groups")
+	if saved is Array:
+		for entry in saved:
+			if not (entry is Dictionary and entry.get("colors") is Array and not entry.colors.is_empty()):
+				continue  # also skips groups saved before groups had palettes
+			var article := _article(str(entry.get("id", "")))
+			var colors := []
+			for hex in entry.colors.slice(0, MAX_COLORS):
+				colors.append(Color.from_string(str(hex), Color.WHITE))
+			groups.append({
+				"id": str(entry.get("id", "group_%d" % groups.size())),
+				"name": str(entry.get("name", article.get("name", "Group"))),
+				"kind": article.get("kind", ""),
+				"prevalence": article.get("prevalence", ""),
+				"about": article.get("about", ""),
+				"background": Color.from_string(str(entry.get("background", "")), Color.GRAY),
+				"colors": colors,
+			})
+	if groups.is_empty():
+		groups = article_copy()
+	var settings := {"custom": data.get("mode") == "custom", "play": str(data.get("play", ARTICLE[0].id)), "groups": groups}
+	if settings.play != RANDOM and find(settings, settings.play).is_empty():
+		settings.play = active(settings)[0].id
+	return settings
 
 
 static func save_settings(settings: Dictionary) -> Error:
-	var custom_colors := {}
-	for id in settings.colors:
-		var shapes := {}
-		for shape_name in settings.colors[id].shapes:
-			shapes[shape_name] = "#" + settings.colors[id].shapes[shape_name].to_html(false)
-		custom_colors[id] = {"background": "#" + settings.colors[id].background.to_html(false), "shapes": shapes}
-	var data := {
-		"mode": "custom" if settings.custom else "article",
-		"play": settings.play,
-		"custom_colors": custom_colors,
-	}
+	var groups := []
+	for group in settings.groups:
+		groups.append({
+			"id": group.id,
+			"name": group.name,
+			"background": "#" + group.background.to_html(false),
+			"colors": group.colors.map(func(c): return "#" + c.to_html(false)),
+		})
+	var data := {"mode": "custom" if settings.custom else "article", "play": settings.play, "custom_groups": groups}
 	var file := FileAccess.open(PATH, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
@@ -116,17 +106,54 @@ static func save_settings(settings: Dictionary) -> Error:
 	return OK
 
 
-## The group to play next: the chosen one, or a random one.
+static func _article(id: String) -> Dictionary:
+	for group in ARTICLE:
+		if group.id == id:
+			return group
+	return {}
+
+
+## The groups in use: the article's, or the player's own when custom.
+static func active(settings: Dictionary) -> Array:
+	return settings.groups if settings.custom else ARTICLE
+
+
+## The group in use with this id, or {} if there is none.
+static func find(settings: Dictionary, id: String) -> Dictionary:
+	for group in active(settings):
+		if group.id == id:
+			return group
+	return {}
+
+
+## The id of the group to play next: the chosen one, or a random one.
 static func pick(settings: Dictionary) -> String:
-	if settings.play == RANDOM:
-		return ARTICLE.pick_random().id
-	return settings.play
+	var group := find(settings, settings.play)
+	if group.is_empty():
+		group = active(settings).pick_random()
+	return group.id
 
 
-## {background, shapes: {shape name: color}} for group id, from the article or
-## the custom colors as settings say.
-static func colors(settings: Dictionary, id: String) -> Dictionary:
-	if settings.custom:
-		return settings.colors[id]
-	var group := article_group(id)
-	return {"background": group.background, "shapes": group.shapes}
+## Indices into a palette of palette_size colors for piece_count pieces, where
+## piece i is copy i / shape_count of shape i % shape_count, as the game lays
+## them out. A level uses one color per piece up to the whole palette, picked
+## at random, and copies of one shape take different colors where there are
+## enough.
+static func piece_colors(palette_size: int, shape_count: int, piece_count: int) -> Array[int]:
+	var order := range(palette_size)
+	order.shuffle()
+	var used := mini(palette_size, piece_count)
+	var indices: Array[int] = []
+	for i in piece_count:
+		indices.append(order[(i % shape_count + i / shape_count) % used])
+	return indices
+
+
+## CIELAB lightness (L*, 0 black to 100 white) of an sRGB color.
+static func lightness(color: Color) -> float:
+	var y := 0.2126 * _linear(color.r) + 0.7152 * _linear(color.g) + 0.0722 * _linear(color.b)
+	return 116.0 * pow(y, 1.0 / 3.0) - 16.0 if y > 0.008856 else 903.3 * y
+
+
+static func _linear(c: float) -> float:
+	return c / 12.92 if c <= 0.04045 else pow((c + 0.055) / 1.055, 2.4)

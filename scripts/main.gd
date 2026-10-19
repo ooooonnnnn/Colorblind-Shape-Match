@@ -153,18 +153,15 @@ func new_level() -> void:
 	_chime_step = 0
 	level_num += 1
 	level_label.text = str(level_num)
-	# Each level plays one color group, and only its shapes, so a level never
-	# has more holes than the group has shapes.
-	var group := ColorGroups.pick(color_groups)
-	var group_colors := ColorGroups.colors(color_groups, group)
-	dots.show_group(group_colors)
-	hole_count = mini(config.holes, group_colors.shapes.size())
+	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups))
+	dots.show_group(group)
+	hole_count = config.holes
 	pieces_per_shape = config.shapes
 	level_time = config.duration
 	dots.visible = config.filter
 	dots.process_mode = Node.PROCESS_MODE_INHERIT if config.filter else Node.PROCESS_MODE_DISABLED
 
-	var shapes := Shapes.pick(hole_count, group_colors.shapes.keys())
+	var shapes := Shapes.pick(hole_count)
 	var side := ShapeView.side_for(board_size)
 	var hole_radii: Array[float] = []
 	for shape in shapes:
@@ -185,10 +182,12 @@ func new_level() -> void:
 		hole.gui_input.connect(_on_hole_input.bind(hole))
 		holes.append(hole)
 
+	var colors := ColorGroups.piece_colors(group.colors.size(), hole_count, piece_radii.size())
 	for i in piece_radii.size():
 		var p := ShapeView.new()
 		p.setup(shapes[i % hole_count], true)
-		p.fill = dots.shape_color(p.shape_name)
+		p.set_meta("color", colors[i])
+		p.fill = dots.figure_color(colors[i])
 		p.target_hole = holes[i % hole_count]
 		p.home = piece_spots[i] / board_size
 		p.norm_pos = p.home
@@ -202,7 +201,7 @@ func new_level() -> void:
 
 func _recolor_pieces() -> void:
 	for p in pieces:
-		p.fill = dots.shape_color(p.shape_name)
+		p.fill = dots.figure_color(p.get_meta("color"))
 
 
 func _clear_board() -> void:

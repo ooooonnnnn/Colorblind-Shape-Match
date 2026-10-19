@@ -35,10 +35,9 @@ static func radius(points: PackedVector2Array) -> float:
 	return r / 100.0
 
 
-## Distinct shape families per level so every piece fits exactly one hole,
-## drawn from the given names (all shapes by default).
-static func pick(n: int, from: Array = NAMES) -> Array[Dictionary]:
-	var names := from.duplicate()
+## Distinct shape families per level so every piece fits exactly one hole.
+static func pick(n: int) -> Array[Dictionary]:
+	var names := NAMES.duplicate()
 	names.shuffle()
 	var shapes: Array[Dictionary] = []
 	for shape_name in names.slice(0, n):
