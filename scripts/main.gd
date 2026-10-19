@@ -7,6 +7,8 @@ const MIN_LOOK_MS := 10000   # how long a level must have been up before leaving
 const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
 const SPACING := 16.0        # px of clear space between bounding circles at the start of a level
 const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tray edge
+const EDGE_GROWTH := 1.2     # pieces swell up to this when pressed, squished or picked up
+const EDGE_GAP := 16.0       # px of full-size dots kept between a piece and the board's edge
 const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 
 @onready var content: VBoxContainer = $Content
@@ -131,8 +133,10 @@ func _scatter_pieces(radii: Array[float], keep_out: Rect2) -> Array[Vector2]:
 func _free_spot(spots: Array[Vector2], radii: Array[float], keep_out: Rect2) -> Vector2:
 	var r := radii[spots.size()]
 	var blocked := keep_out.grow(r + SPACING)
+	# Room for the piece at its biggest, so it never pokes past the dots.
+	var edge := r * EDGE_GROWTH + EDGE_GAP
 	for _try in 200:
-		var c := Vector2(randf_range(r, board_size.x - r), randf_range(r, board_size.y - r))
+		var c := Vector2(randf_range(edge, board_size.x - edge), randf_range(edge, board_size.y - edge))
 		if blocked.has_point(c):
 			continue
 		var free := true
