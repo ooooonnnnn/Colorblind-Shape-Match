@@ -3,11 +3,13 @@ extends Control
 ## A piece or a hole. Draws one polygon from a 100x100 box, positioned by its
 ## center in board-relative (0..1) coordinates so it follows board resizes.
 
-const SIZE := 0.15  # width as a fraction of the board's shorter side
+const CONFIG_PATH := "res://shape_size.json"
 
 const PIECE_FILL := Color("f1ede2")
 const HOLE_FILL := Color("0e1118")
 const ACCENT := Color.WHITE
+
+static var side_fraction := 0.15  # width as a fraction of the board's shorter side
 
 var is_piece := false
 var shape_name := ""
@@ -78,9 +80,27 @@ func _ready() -> void:
 	_update_layout()
 
 
+## Reads side_fraction from CONFIG_PATH.
+static func load_size() -> void:
+	var data = JSON.parse_string(FileAccess.get_file_as_string(CONFIG_PATH))
+	if not data is Dictionary:
+		push_error("Bad or missing shape size in %s" % CONFIG_PATH)
+		return
+	side_fraction = clampf(float(data.get("size_percent", side_fraction * 100)) / 100, 0.01, 1.0)
+
+
+static func save_size() -> Error:
+	var file := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
+	if file == null:
+		return FileAccess.get_open_error()
+	var percent := snappedf(side_fraction * 100, 0.01)
+	file.store_string(JSON.stringify({"size_percent": int(percent) if percent == int(percent) else percent}, "\t") + "\n")
+	return OK
+
+
 ## Side length in pixels of a piece or hole on a board of this size.
 static func side_for(board_size: Vector2) -> float:
-	return minf(board_size.x, board_size.y) * SIZE
+	return minf(board_size.x, board_size.y) * side_fraction
 
 
 func _update_layout() -> void:

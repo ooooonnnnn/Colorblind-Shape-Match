@@ -65,9 +65,28 @@ func _load_config() -> void:
 	if not data is Dictionary:
 		push_error("Bad or missing dot config in %s" % CONFIG_PATH)
 		data = {}
+	apply_config(data)
+
+
+## Takes {max_radius, gap, fill_percent}, as in CONFIG_PATH; missing keys keep
+## their current value. The circles are repacked with the new settings.
+func apply_config(data: Dictionary) -> void:
 	max_radius = maxf(MIN_RADIUS, float(data.get("max_radius", max_radius)))
 	gap = maxf(0.0, float(data.get("gap", gap)))
 	fill = clampf(float(data.get("fill_percent", fill * 100)) / 100, 0.0, 1.0)
+	_packed_in = Rect2()
+
+
+func save_config() -> Error:
+	var file := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
+	if file == null:
+		return FileAccess.get_open_error()
+	var data := {"max_radius": max_radius, "gap": gap, "fill_percent": snappedf(fill * 100, 0.01)}
+	for key in data:
+		if data[key] == int(data[key]):
+			data[key] = int(data[key])  # keep whole numbers free of a trailing .0
+	file.store_string(JSON.stringify(data, "\t", false) + "\n")
+	return OK
 
 
 ## Gives the circle shader each H, S and V noise's wavelength and amplitude,

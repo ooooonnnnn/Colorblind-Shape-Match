@@ -1,7 +1,6 @@
 extends Control
 
 const Dots := preload("res://scripts/dots.gd")
-const CONFIG_PATH := "res://config.json"
 const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
 const SPACING := 16.0        # px of clear space between bounding circles at the start of a level
 const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tray edge
@@ -20,7 +19,7 @@ const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 @onready var chime: AudioStreamPlayer = $Chime
 @onready var dots: Dots = $Dots
 
-var levels: Array[Dictionary] = []  # entries from CONFIG_PATH
+var levels: Array[Dictionary] = []  # see LevelConfig
 var hole_count := 0
 var pieces_per_shape := 0  # copies of each shape to sort into its hole
 var level_time := 0.0      # seconds; <= 0 means no time limit
@@ -39,7 +38,8 @@ var _chime_step := 0  # rises with each placement, resets each level
 
 
 func _ready() -> void:
-	_load_levels()
+	levels = LevelConfig.load_levels()
+	ShapeView.load_size()
 	dots.colors_changed.connect(_recolor_pieces)
 	resized.connect(_layout)
 	_layout()
@@ -55,22 +55,6 @@ func _layout() -> void:
 
 
 # ---------- Level config ----------
-
-## Reads the level list. Each entry is {duration, holes, shapes, repetitions};
-## see _level_config for how repetitions are walked.
-func _load_levels() -> void:
-	var data = JSON.parse_string(FileAccess.get_file_as_string(CONFIG_PATH))
-	if not (data is Dictionary and data.get("levels") is Array and not data.levels.is_empty()):
-		push_error("Bad or missing level list in %s" % CONFIG_PATH)
-		data = {"levels": [{}]}
-	for entry in data.levels:
-		levels.append({
-			"duration": float(entry.get("duration", 0)),
-			"holes": clampi(int(entry.get("holes", 3)), 1, Shapes.NAMES.size()),
-			"shapes": maxi(1, int(entry.get("shapes", 1))),
-			"repetitions": int(entry.get("repetitions", 0)),
-		})
-
 
 ## The entry for level n (1-based), or {} once the list has run out. An entry
 ## with repetitions <= 0 repeats forever.

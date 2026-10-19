@@ -1,0 +1,196 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/config.gd" id="1_config"]
+[ext_resource type="Script" path="res://scripts/dots.gd" id="2_dots"]
+
+[sub_resource type="Theme" id="Theme_ui"]
+default_font_size = 16
+Label/colors/font_color = Color(0.603922, 0.639216, 0.709804, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_board"]
+bg_color = Color(0.145098, 0.164706, 0.215686, 1)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_tray"]
+bg_color = Color(0.105882, 0.121569, 0.164706, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.231373, 0.258824, 0.329412, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[node name="Config" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("Theme_ui")
+script = ExtResource("1_config")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 24
+
+[node name="Columns" type="HBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="Settings" type="VBoxContainer" parent="Margin/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="LevelsTitle" type="Label" parent="Margin/Columns/Settings"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
+theme_override_font_sizes/font_size = 22
+text = "Level sequences"
+
+[node name="LevelsScroll" type="ScrollContainer" parent="Margin/Columns/Settings"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Levels" type="GridContainer" parent="Margin/Columns/Settings/LevelsScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 8
+columns = 7
+
+[node name="AddLevel" type="Button" parent="Margin/Columns/Settings"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Add level sequence"
+
+[node name="DotsTitle" type="Label" parent="Margin/Columns/Settings"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
+theme_override_font_sizes/font_size = 22
+text = "Ishihara filter"
+
+[node name="DotsGrid" type="GridContainer" parent="Margin/Columns/Settings"]
+layout_mode = 2
+theme_override_constants/h_separation = 16
+columns = 2
+
+[node name="MaxRadiusLabel" type="Label" parent="Margin/Columns/Settings/DotsGrid"]
+layout_mode = 2
+text = "Largest dot radius"
+
+[node name="MaxRadius" type="SpinBox" parent="Margin/Columns/Settings/DotsGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 50.0
+step = 0.5
+value = 5.0
+suffix = "px"
+
+[node name="GapLabel" type="Label" parent="Margin/Columns/Settings/DotsGrid"]
+layout_mode = 2
+text = "Gap between dots"
+
+[node name="Gap" type="SpinBox" parent="Margin/Columns/Settings/DotsGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+max_value = 20.0
+step = 0.5
+value = 1.0
+suffix = "px"
+
+[node name="FillLabel" type="Label" parent="Margin/Columns/Settings/DotsGrid"]
+layout_mode = 2
+text = "Area covered by dots"
+
+[node name="Fill" type="SpinBox" parent="Margin/Columns/Settings/DotsGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+value = 80.0
+suffix = "%"
+
+[node name="ShapesTitle" type="Label" parent="Margin/Columns/Settings"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
+theme_override_font_sizes/font_size = 22
+text = "Shapes"
+
+[node name="ShapesGrid" type="GridContainer" parent="Margin/Columns/Settings"]
+layout_mode = 2
+theme_override_constants/h_separation = 16
+columns = 2
+
+[node name="SizeLabel" type="Label" parent="Margin/Columns/Settings/ShapesGrid"]
+layout_mode = 2
+text = "Size (of the board's shorter side)"
+
+[node name="Size" type="SpinBox" parent="Margin/Columns/Settings/ShapesGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 50.0
+value = 15.0
+suffix = "%"
+
+[node name="Buttons" type="HBoxContainer" parent="Margin/Columns/Settings"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Back" type="Button" parent="Margin/Columns/Settings/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 44)
+layout_mode = 2
+text = "Return to menu"
+
+[node name="Save" type="Button" parent="Margin/Columns/Settings/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 44)
+layout_mode = 2
+text = "Save"
+
+[node name="PreviewColumn" type="VBoxContainer" parent="Margin/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="PreviewTitle" type="Label" parent="Margin/Columns/PreviewColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
+theme_override_font_sizes/font_size = 22
+text = "Preview"
+
+[node name="Preview" type="Panel" parent="Margin/Columns/PreviewColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_board")
+
+[node name="Tray" type="Panel" parent="Margin/Columns/PreviewColumn/Preview"]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_tray")
+
+[node name="Dots" type="CanvasLayer" parent="." node_paths=PackedStringArray("area", "mask")]
+script = ExtResource("2_dots")
+area = NodePath("../Margin/Columns/PreviewColumn/Preview")
+mask = NodePath("../Margin/Columns/PreviewColumn/Preview/Tray")

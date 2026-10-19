@@ -1,5 +1,5 @@
 {
-	"max_radius": 5,
-	"gap": 1,
-	"fill_percent": 80
+	"max_radius": 3,
+	"gap": 0.5,
+	"fill_percent": 85
 }
