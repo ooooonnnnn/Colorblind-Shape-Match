@@ -48,13 +48,18 @@ func _on_down() -> void:
 	_holding = true
 	_pop.pitch_scale = randf_range(0.9, 1.15)
 	_pop.play()
+	squish()
+	if hold_seconds <= 0:
+		activated.emit()
+
+
+## Squish flat and spring back, like a soft toy being pressed.
+func squish(amount := 0.16) -> void:
 	if _squash_tween:
 		_squash_tween.kill()
 	_squash_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	for s in [0.16, -0.1, 0.04, 0.0]:
+	for s in [amount, -amount * 0.6, amount * 0.25, 0.0]:
 		_squash_tween.tween_property(self, "squash", s, 0.08)
-	if hold_seconds <= 0:
-		activated.emit()
 
 
 func _process(delta: float) -> void:
