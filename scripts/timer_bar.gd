@@ -5,8 +5,8 @@ extends Control
 
 const STRIPE := 8.0  # stripe thickness, measured across the 45° stripes
 
-const FG := Color("e9ecf2")
-const MUTED := Color("9aa3b5")
+const FG := Color("ffd166")     # sunny yellow
+const MUTED := Color("ff9f43")  # warmer orange under the low-time stripes
 
 var ratio := 1.0:
 	set(v):
@@ -20,11 +20,16 @@ var low := false:
 			queue_redraw()
 
 var _bg := StyleBoxFlat.new()
+var _fill := StyleBoxFlat.new()
 
 
 func _init() -> void:
-	_bg.bg_color = Color("252a37")
-	_bg.set_corner_radius_all(4)
+	_bg.bg_color = Color(1, 1, 1, 0.6)
+	_bg.set_border_width_all(2)
+	_bg.border_color = Icons.INK
+	_bg.set_corner_radius_all(99)
+	_fill.bg_color = FG
+	_fill.set_corner_radius_all(99)
 
 
 func _draw() -> void:
@@ -34,7 +39,7 @@ func _draw() -> void:
 		return
 	var h := size.y
 	if not low:
-		draw_rect(Rect2(0, 0, w, h), FG)
+		draw_style_box(_fill, Rect2(0, 0, maxf(w, h), h))
 		return
 
 	draw_rect(Rect2(0, 0, w, h), MUTED)
