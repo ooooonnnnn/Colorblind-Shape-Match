@@ -6,9 +6,7 @@ extends Control
 const SIZE := 0.15  # width as a fraction of the board's shorter side
 
 const PIECE_FILL := Color("f1ede2")
-const PIECE_EDGE := Color("8b8778")
 const HOLE_FILL := Color("0e1118")
-const HOLE_EDGE := Color("3b4254")
 const ACCENT := Color.WHITE
 
 var is_piece := false
@@ -173,10 +171,8 @@ func _draw() -> void:
 
 	if is_piece:
 		draw_colored_polygon(_points, fill)
-		draw_polyline(outline, fill if placed else PIECE_EDGE, 2.0, true)
 	else:
 		draw_colored_polygon(_points, HOLE_FILL)
-		draw_polyline(outline, HOLE_EDGE, 2.5, true)
 
 	draw_set_transform(Vector2.ZERO)
 	if has_focus() and _show_focus:
