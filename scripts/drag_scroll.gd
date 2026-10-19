@@ -14,6 +14,9 @@ extends Node
 ##   press had never been held.
 ## The slop is a physical distance, so a wobbly tap on a dense tablet screen
 ## still counts as a tap.
+##
+## The mouse wheel scrolls too, wherever the pointer is on the scroll; it never
+## reaches the controls, so turning it over a slider does not change the slider.
 
 const SLOP_INCHES := 0.1   # how far a tap may wander, about 2.5 mm
 const MIN_SLOP := 12.0     # px, so a mouse needs a deliberate drag too
@@ -29,11 +32,20 @@ var _replaying := false  # true while held-back events are sent on, so _input le
 func _input(event: InputEvent) -> void:
 	if _replaying:
 		return
+	if event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		var scroll := _scroll_at(event.position)
+		if scroll:
+			get_viewport().set_input_as_handled()
+			if event.pressed:
+				# The same step ScrollContainer takes for a wheel notch.
+				var bar := scroll.get_v_scroll_bar()
+				var step: float = bar.page / 8.0 * (event.factor if event.factor > 0 else 1.0)
+				bar.value += step if event.button_index == MOUSE_BUTTON_WHEEL_DOWN else -step
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			var scroll: ScrollContainer = target.call() if target.is_valid() else null
-			if scroll and scroll.is_visible_in_tree() and scroll.get_global_rect().has_point(event.position) \
-					and not scroll.get_v_scroll_bar().get_global_rect().has_point(event.position):
+			var scroll := _scroll_at(event.position)
+			if scroll and not scroll.get_v_scroll_bar().get_global_rect().has_point(event.position):
 				_drag = {"scroll": scroll, "press": event, "start": event.position, "from": scroll.scroll_vertical,
 						"slider": _slider_at(scroll, event.position), "mode": DECIDING}
 				get_viewport().set_input_as_handled()
@@ -61,6 +73,14 @@ func _input(event: InputEvent) -> void:
 			SCROLLING:
 				get_viewport().set_input_as_handled()
 				_drag.scroll.scroll_vertical = int(_drag.from - moved.y)
+
+
+## The scroll to work on, if pos is on it.
+func _scroll_at(pos: Vector2) -> ScrollContainer:
+	var scroll: ScrollContainer = target.call() if target.is_valid() else null
+	if scroll and scroll.is_visible_in_tree() and scroll.get_global_rect().has_point(pos):
+		return scroll
+	return null
 
 
 ## The slop in this viewport's pixels.
