@@ -153,6 +153,8 @@ func new_level() -> void:
 	hole_count = config.holes
 	pieces_per_shape = config.shapes
 	level_time = config.duration
+	dots.visible = config.filter
+	dots.process_mode = Node.PROCESS_MODE_INHERIT if config.filter else Node.PROCESS_MODE_DISABLED
 
 	var shapes := Shapes.pick(hole_count)
 	var side := ShapeView.side_for(board_size)

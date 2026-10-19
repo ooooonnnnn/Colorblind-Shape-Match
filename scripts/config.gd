@@ -7,7 +7,7 @@ const Dots := preload("res://scripts/dots.gd")
 const PREVIEW_SHAPES := ["square", "star", "crescent"]
 const PREVIEW_SPACING := 16.0  # px between neighbouring preview shapes
 const TRAY_PADDING := 24.0     # px between the holes and the tray edge, as in the game
-const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1}
+const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1, "filter": true}
 
 @onready var levels_grid: GridContainer = %Levels
 @onready var add_level: Button = %AddLevel
@@ -27,7 +27,7 @@ var _pieces: Array[ShapeView] = []
 
 
 func _ready() -> void:
-	for header in ["Duration", "", "Holes", "Shapes per hole", "Repetitions", "", ""]:
+	for header in ["Duration", "", "Holes", "Shapes per hole", "Repetitions", "", "", ""]:
 		var label := Label.new()
 		label.text = header
 		levels_grid.add_child(label)
@@ -61,8 +61,10 @@ func _add_row(entry: Dictionary) -> void:
 		"shapes": _spin(1, 20, entry.shapes),
 		"repetitions": _spin(1, 99, 1),
 		"endless": _check("Endless"),
+		"filter": _check("Ishihara filter"),
 		"remove": Button.new(),
 	}
+	row.filter.button_pressed = entry.filter
 	row.no_limit.toggled.connect(func(on): row.duration.editable = not on)
 	row.endless.toggled.connect(func(on): row.repetitions.editable = not on)
 	if entry.duration > 0:
@@ -118,6 +120,7 @@ func _levels() -> Array[Dictionary]:
 			"holes": int(row.holes.value),
 			"shapes": int(row.shapes.value),
 			"repetitions": 0 if row.endless.button_pressed else int(row.repetitions.value),
+			"filter": row.filter.button_pressed,
 		})
 	return levels
 
