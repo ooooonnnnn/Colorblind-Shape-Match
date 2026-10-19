@@ -1,6 +1,7 @@
 extends Control
 
 const Dots := preload("res://scripts/dots.gd")
+const ColorGroups := preload("res://scripts/color_groups.gd")
 const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
 const SPACING := 16.0        # px of clear space between bounding circles at the start of a level
 const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tray edge
@@ -25,6 +26,7 @@ const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 @onready var effects: Effects = $Effects
 
 var levels: Array[Dictionary] = []  # see LevelConfig
+var color_groups := {}  # see ColorGroups.load_settings
 var hole_count := 0
 var pieces_per_shape := 0  # copies of each shape to sort into its hole
 var level_time := 0.0      # seconds; <= 0 means no time limit
@@ -43,6 +45,7 @@ var _chime_step := 0  # rises with each placement, resets each level
 
 func _ready() -> void:
 	levels = LevelConfig.load_levels()
+	color_groups = ColorGroups.load_settings()
 	ShapeView.load_size()
 	dots.colors_changed.connect(_recolor_pieces)
 	home.activated.connect(_go_home)
@@ -156,6 +159,8 @@ func new_level() -> void:
 	_chime_step = 0
 	level_num += 1
 	effects.clear_star()
+	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups))
+	dots.show_group(group)
 	hole_count = config.holes
 	pieces_per_shape = config.shapes
 	level_time = config.duration
@@ -185,10 +190,12 @@ func new_level() -> void:
 		hole.gui_input.connect(_on_hole_input.bind(hole))
 		holes.append(hole)
 
+	var colors := ColorGroups.piece_colors(group.colors.size(), hole_count, piece_radii.size())
 	for i in piece_radii.size():
 		var p := ShapeView.new()
 		p.setup(shapes[i % hole_count], true)
-		p.fill = dots.shape_color(p.shape_name)
+		p.set_meta("color", colors[i])
+		p.fill = dots.figure_color(colors[i])
 		p.target_hole = holes[i % hole_count]
 		p.home = piece_spots[i] / board_size
 		p.norm_pos = p.home
@@ -202,7 +209,7 @@ func new_level() -> void:
 
 func _recolor_pieces() -> void:
 	for p in pieces:
-		p.fill = dots.shape_color(p.shape_name)
+		p.fill = dots.figure_color(p.get_meta("color"))
 
 
 func _clear_board() -> void:

@@ -1,0 +1,42 @@
+{
+	"mode": "article",
+	"play": "random",
+	"custom_groups": [
+		{
+			"id": "protan",
+			"name": "Protan",
+			"background": "#7c9449",
+			"colors": [
+				"#e0655e",
+				"#d76d49",
+				"#c47a3e",
+				"#bc72b3",
+				"#d1689b"
+			]
+		},
+		{
+			"id": "deutan",
+			"name": "Deutan",
+			"background": "#489b6d",
+			"colors": [
+				"#e0655e",
+				"#bc72b3",
+				"#9e7ec1",
+				"#d36a8d",
+				"#d76d49"
+			]
+		},
+		{
+			"id": "tritan",
+			"name": "Tritan",
+			"background": "#8b8b8b",
+			"colors": [
+				"#8785c3",
+				"#a27eb7",
+				"#608fbf",
+				"#8b9051",
+				"#9d8a4d"
+			]
+		}
+	]
+}

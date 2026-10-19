@@ -7,6 +7,10 @@ const CONFIG_PATH := "res://shape_size.json"
 
 const PIECE_FILL := Color("f1ede2")
 const HOLE_FILL := Color("0e1118")
+## Width of a piece's outline, as a percentage of its side. Pieces are drawn
+## hollow so they are harder to spot in the dot filter; much thinner and the
+## line slips between dot centers, which is where the filter samples colors.
+const PIECE_OUTLINE := 6.0
 const ACCENT := Color.WHITE
 
 static var side_fraction := 0.15  # width as a fraction of the board's shorter side
@@ -204,6 +208,14 @@ func _on_focus_entered() -> void:
 	queue_redraw()
 
 
+## A closed outline PIECE_OUTLINE wide, with rounded corners so sharp points
+## like the star's stay joined.
+func _draw_hollow(outline: PackedVector2Array, color: Color) -> void:
+	draw_polyline(outline, color, PIECE_OUTLINE, true)
+	for v in outline:
+		draw_circle(v, PIECE_OUTLINE / 2, color)
+
+
 func _draw() -> void:
 	if _points.is_empty():
 		return
@@ -214,15 +226,15 @@ func _draw() -> void:
 
 	if dragging:
 		var shadow := PackedVector2Array()
-		for v in _points:
+		for v in outline:
 			shadow.append(v + Vector2(0, 6.0 / k))
-		draw_colored_polygon(shadow, Color(0, 0, 0, 0.35))
+		_draw_hollow(shadow, Color(0, 0, 0, 0.35))
 	if selected:
 		draw_polyline(outline, Color(ACCENT, 0.25), 12.0, true)
 		draw_polyline(outline, Color(ACCENT, 0.6), 6.0, true)
 
 	if is_piece:
-		draw_colored_polygon(_points, fill)
+		_draw_hollow(outline, fill)
 	else:
 		draw_colored_polygon(_points, HOLE_FILL)
 
