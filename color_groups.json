@@ -1,0 +1,72 @@
+{
+	"mode": "article",
+	"play": "random",
+	"custom_groups": [
+		{
+			"id": "red_green",
+			"name": "Red-green screening",
+			"about": "Ishihara / CVTME vanishing plates: red, orange and red-purple on yellow-green to blue-green. Protan and deutan, ~8% of males, ~0.5% of females.",
+			"background": "#519b5c",
+			"shapes": {
+				"circle": "#e0655e",
+				"star": "#ca7737",
+				"square": "#cd6b9a"
+			}
+		},
+		{
+			"id": "transformation",
+			"name": "Transformation",
+			"about": "Inverted plates: unsaturated blue-green and yellow-green on red-orange. Protan and deutan, ~8% of males, ~0.5% of females.",
+			"background": "#d76d49",
+			"shapes": {
+				"circle": "#389a94",
+				"star": "#859153",
+				"square": "#389a94"
+			}
+		},
+		{
+			"id": "protan_deutan",
+			"name": "Protan vs deutan",
+			"about": "Ishihara plates 26/27: purple-magenta (protan line) and red (deutan line) on neutral gray. Protan ~2%, deutan ~6% of males.",
+			"background": "#8b8b8b",
+			"shapes": {
+				"circle": "#ab79b9",
+				"star": "#cc726a",
+				"square": "#ab79b9"
+			}
+		},
+		{
+			"id": "hrr_protan",
+			"name": "HRR protan",
+			"about": "HRR: unsaturated red and cyan on neutral gray. Protan, ~2% of males.",
+			"background": "#919191",
+			"shapes": {
+				"circle": "#c57e7c",
+				"triangle": "#4e9d9f",
+				"square": "#c57e7c"
+			}
+		},
+		{
+			"id": "hrr_deutan",
+			"name": "HRR deutan",
+			"about": "HRR: green and magenta on neutral gray. Deutan, ~6% of males (the most common deficiency).",
+			"background": "#919191",
+			"shapes": {
+				"circle": "#729b6e",
+				"triangle": "#b281ab",
+				"square": "#729b6e"
+			}
+		},
+		{
+			"id": "hrr_tritan",
+			"name": "HRR tritan",
+			"about": "HRR: blue-purple and yellow-green on neutral gray. Tritan, under 0.01%, males and females alike.",
+			"background": "#919191",
+			"shapes": {
+				"circle": "#8e8bc0",
+				"triangle": "#91945e",
+				"square": "#8e8bc0"
+			}
+		}
+	]
+}
