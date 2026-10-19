@@ -12,6 +12,7 @@ const CONFIG_PATH := "res://dots.json"
 const NOISE_PATH := "res://noise.json"
 const ColorGroups := preload("res://scripts/color_groups.gd")
 const MIN_RADIUS := 1.0     # px; spots that only fit a smaller circle are skipped
+const DEFAULT_BOARD_COLOR := Color("dde6ef")  # a soft blue-gray, like the paper of a printed plate
 const CELL := 4.0          # px; side of the cells used to track where free space is left
 const NOISE_PARTS := {"background": "background", "shapes": "shape"}  # NOISE_PATH key: shader uniform prefix
 const NOISE_CHANNELS := ["hue", "saturation", "value"]
@@ -20,12 +21,20 @@ const NOISE_CHANNELS := ["hue", "saturation", "value"]
 @export var mask: Control  ## stays clear of circles
 
 @export_group("Colors")
+## Shows between the dots, like the paper of a printed plate, and is the area's
+## own color, so levels without the filter look the same. It is the same around
+## figure and background dots, so it gives no cue to where a piece is.
+@export var board_color := DEFAULT_BOARD_COLOR:
+	set(v):
+		board_color = v
+		if is_node_ready():
+			_show_board_color()
 @export var background_color := Color("7c9449")
 ## The colors pieces are filled with, at most ColorGroups.MAX_COLORS.
 @export var figure_colors := PackedColorArray([Color("e0655e"), Color("d76d49"), Color("c47a3e"), Color("bc72b3"), Color("d1689b")])
 
-var max_radius := 14.0  # px
-var gap := 3.0          # px between neighbouring circles
+var max_radius := 6.0   # px
+var gap := 1.0          # px between neighbouring circles
 var fill := 0.5         # fraction of the area outside the mask to cover
 ## {part: {channel: {wavelength, amplitude}}} for each NOISE_PARTS key and NOISE_CHANNELS entry
 var noise := {}
@@ -39,11 +48,9 @@ var _shown_colors := PackedColorArray()  # the base colors last given to the sha
 
 func _ready() -> void:
 	layer = 100
-	_load_config()
 
 	var bg_material := ShaderMaterial.new()
 	bg_material.shader = preload("res://shaders/dot_background.gdshader")
-	bg_material.set_shader_parameter("background", ProjectSettings.get_setting("rendering/environment/defaults/default_clear_color"))
 	_background.material = bg_material
 	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_background)
@@ -58,6 +65,8 @@ func _ready() -> void:
 	_circles.multimesh.use_custom_data = true
 	_circles.multimesh.mesh = quad
 	add_child(_circles)
+	_load_config()
+	_show_board_color()
 	_load_noise()
 
 
@@ -69,13 +78,25 @@ func _load_config() -> void:
 	apply_config(data)
 
 
-## Takes {max_radius, gap, fill_percent}, as in CONFIG_PATH; missing keys keep
-## their current value. The circles are repacked with the new settings.
+## Takes {max_radius, gap, fill_percent, board_color}, as in CONFIG_PATH;
+## missing keys keep their current value. The circles are repacked with the new
+## settings.
 func apply_config(data: Dictionary) -> void:
 	max_radius = maxf(MIN_RADIUS, float(data.get("max_radius", max_radius)))
 	gap = maxf(0.0, float(data.get("gap", gap)))
 	fill = clampf(float(data.get("fill_percent", fill * 100)) / 100, 0.0, 1.0)
+	board_color = Color.from_string(str(data.get("board_color", "")), board_color)
 	_packed_in = Rect2()
+
+
+## Paints the gaps and the area's own panel in board_color.
+func _show_board_color() -> void:
+	_background.material.set_shader_parameter("background", board_color)
+	var panel := area.get_theme_stylebox("panel") if area else null
+	if panel is StyleBoxFlat:
+		var painted: StyleBoxFlat = panel.duplicate()
+		painted.bg_color = board_color
+		area.add_theme_stylebox_override("panel", painted)
 
 
 func save_config() -> Error:
@@ -86,6 +107,7 @@ func save_config() -> Error:
 	for key in data:
 		if data[key] == int(data[key]):
 			data[key] = int(data[key])  # keep whole numbers free of a trailing .0
+	data.board_color = "#" + board_color.to_html(false)
 	file.store_string(JSON.stringify(data, "\t", false) + "\n")
 	return OK
 
@@ -181,6 +203,9 @@ func _process(_delta: float) -> void:
 	_background.material.set_shader_parameter("mask_rect",
 			Vector4(mask_rect.position.x / size.x, mask_rect.position.y / size.y,
 					mask_rect.size.x / size.x, mask_rect.size.y / size.y))
+	_background.material.set_shader_parameter("area_size", size)
+	var mask_style := mask.get_theme_stylebox("panel") if mask else null
+	_background.material.set_shader_parameter("mask_radius", mask_style.corner_radius_top_left if mask_style is StyleBoxFlat else 0.0)
 	_circles.position = area_rect.position
 	_show(_pack(size, mask_rect))
 

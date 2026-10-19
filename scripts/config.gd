@@ -20,6 +20,8 @@ const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1,
 @onready var max_radius: SpinBox = %MaxRadius
 @onready var gap: SpinBox = %Gap
 @onready var fill: SpinBox = %Fill
+@onready var board_color: ColorPickerButton = %BoardColor
+@onready var board_color_default: Button = %BoardColorDefault
 @onready var noise_grid: GridContainer = %Noise
 @onready var open_groups: Button = %OpenGroups
 @onready var settings_column: VBoxContainer = $Margin/Columns/Settings
@@ -31,6 +33,7 @@ const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1,
 @onready var close_groups: Button = %CloseGroups
 @onready var restore_groups: Button = %RestoreGroups
 @onready var size_spin: SpinBox = %Size
+@onready var outline_spin: SpinBox = %Outline
 @onready var back: Button = %Back
 @onready var save: Button = %Save
 @onready var preview: Panel = %Preview
@@ -62,11 +65,18 @@ func _ready() -> void:
 	fill.value = dots.fill * 100
 	for spin in [max_radius, gap, fill]:
 		spin.value_changed.connect(_on_dots_changed)
+	board_color.color = dots.board_color
+	board_color.color_changed.connect(func(color): dots.board_color = color)
+	board_color_default.pressed.connect(func():
+		board_color.color = Dots.DEFAULT_BOARD_COLOR
+		dots.board_color = Dots.DEFAULT_BOARD_COLOR)
 	_build_noise_grid()
 
 	ShapeView.load_size()
 	size_spin.value = ShapeView.side_fraction * 100
 	size_spin.value_changed.connect(_on_size_changed)
+	outline_spin.value = ShapeView.outline_percent
+	outline_spin.value_changed.connect(_on_outline_changed)
 
 	preview.resized.connect(_layout_preview)
 	_build_groups()
@@ -442,6 +452,12 @@ func _on_dots_changed(_value: float) -> void:
 func _on_size_changed(value: float) -> void:
 	ShapeView.side_fraction = value / 100
 	_layout_preview()
+
+
+func _on_outline_changed(value: float) -> void:
+	ShapeView.outline_percent = value
+	for piece in _pieces:
+		piece.queue_redraw()
 
 
 ## Holes in a row inside the tray, with their pieces in a row below.

@@ -127,6 +127,25 @@ layout_mode = 2
 value = 80.0
 suffix = "%"
 
+[node name="BoardColorLabel" type="Label" parent="Margin/Columns/Settings/DotsGrid"]
+layout_mode = 2
+text = "Board background"
+
+[node name="BoardColorRow" type="HBoxContainer" parent="Margin/Columns/Settings/DotsGrid"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BoardColor" type="ColorPickerButton" parent="Margin/Columns/Settings/DotsGrid/BoardColorRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 28)
+layout_mode = 2
+edit_alpha = false
+
+[node name="BoardColorDefault" type="Button" parent="Margin/Columns/Settings/DotsGrid/BoardColorRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Default"
+
 [node name="NoiseTitle" type="Label" parent="Margin/Columns/Settings"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
@@ -161,6 +180,19 @@ layout_mode = 2
 min_value = 1.0
 max_value = 50.0
 value = 15.0
+suffix = "%"
+
+[node name="OutlineLabel" type="Label" parent="Margin/Columns/Settings/ShapesGrid"]
+layout_mode = 2
+text = "Outline thickness (bolder is easier to spot)"
+
+[node name="Outline" type="SpinBox" parent="Margin/Columns/Settings/ShapesGrid"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 50.0
+step = 0.5
+value = 6.0
 suffix = "%"
 
 [node name="Buttons" type="HBoxContainer" parent="Margin/Columns/Settings"]

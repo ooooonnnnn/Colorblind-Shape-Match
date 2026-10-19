@@ -131,7 +131,7 @@ func _draw_particles() -> void:
 		var band := reach / GLOW_BANDS
 		for i in GLOW_BANDS:
 			var f := float(i) / GLOW_BANDS
-			for loop in _glowing.outline_around(ShapeView.PIECE_OUTLINE / 2 + band * (i + 0.5)):
+			for loop in _glowing.outline_around(ShapeView.outline_percent / 2 + band * (i + 0.5)):
 				_canvas.draw_polyline(loop, Color(GLOW_COLOR, 0.42 * (1.0 - f) * (1.0 - f)), band * px + 1.0, true)
 	for p in _particles:
 		var fade := clampf((p.life - p.age) / 0.3, 0.0, 1.0)

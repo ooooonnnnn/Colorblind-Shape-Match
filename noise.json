@@ -2,29 +2,29 @@
 	"background": {
 		"hue": {
 			"wavelength": 10,
-			"amplitude": 0.04
+			"amplitude": 0.02
 		},
 		"saturation": {
 			"wavelength": 10,
-			"amplitude": 0.15
+			"amplitude": 0.05
 		},
 		"value": {
 			"wavelength": 10,
-			"amplitude": 0.2
+			"amplitude": 0.15
 		}
 	},
 	"shapes": {
 		"hue": {
 			"wavelength": 10,
-			"amplitude": 0.04
+			"amplitude": 0.02
 		},
 		"saturation": {
 			"wavelength": 10,
-			"amplitude": 0.15
+			"amplitude": 0.05
 		},
 		"value": {
 			"wavelength": 10,
-			"amplitude": 0.2
+			"amplitude": 0.15
 		}
 	}
 }

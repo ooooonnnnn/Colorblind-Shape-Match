@@ -185,9 +185,12 @@ func new_level() -> void:
 	var hole_radii: Array[float] = []
 	for shape in shapes:
 		hole_radii.append(Shapes.radius(shape.points) * side)
+	# A piece's outline is centered on its edge, so half of it reaches past the
+	# shape; keeping that inside the board stops it showing beyond the dot filter.
+	var outline_reach := side * ShapeView.outline_percent / 200
 	var piece_radii: Array[float] = []
 	for i in hole_count * pieces_per_shape:
-		piece_radii.append(hole_radii[i % hole_count])
+		piece_radii.append(hole_radii[i % hole_count] + outline_reach)
 	var hole_spots := _hole_row(hole_radii, hole_radii.max() * 2)
 	var tray_rect := _bounds(hole_spots, hole_radii).grow(TRAY_PADDING)
 	_place_tray(tray_rect)

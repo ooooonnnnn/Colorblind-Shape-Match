@@ -7,13 +7,13 @@ const CONFIG_PATH := "res://shape_size.json"
 
 const PIECE_FILL := Color("f1ede2")
 const HOLE_FILL := Color("0e1118")
-## Width of a piece's outline, as a percentage of its side. Pieces are drawn
-## hollow so they are harder to spot in the dot filter; much thinner and the
-## line slips between dot centers, which is where the filter samples colors.
-const PIECE_OUTLINE := 6.0
 const ACCENT := Color.WHITE
 
-static var side_fraction := 0.15  # width as a fraction of the board's shorter side
+static var side_fraction := 0.2  # width as a fraction of the board's shorter side
+## Width of a piece's outline, as a percentage of its side. Pieces are drawn
+## hollow so they are harder to spot in the dot filter; bolder is easier, and
+## much thinner the line slips between dot centers, where the filter samples.
+static var outline_percent := 26.0
 
 var is_piece := false
 var shape_name := ""
@@ -104,21 +104,25 @@ func _breathe() -> void:
 	t.tween_property(self, "breath", 1.0, 1.2)
 
 
-## Reads side_fraction from CONFIG_PATH.
+## Reads side_fraction and outline_percent from CONFIG_PATH.
 static func load_size() -> void:
 	var data = JSON.parse_string(FileAccess.get_file_as_string(CONFIG_PATH))
 	if not data is Dictionary:
 		push_error("Bad or missing shape size in %s" % CONFIG_PATH)
 		return
 	side_fraction = clampf(float(data.get("size_percent", side_fraction * 100)) / 100, 0.01, 1.0)
+	outline_percent = clampf(float(data.get("outline_percent", outline_percent)), 1.0, 50.0)
 
 
 static func save_size() -> Error:
 	var file := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
-	var percent := snappedf(side_fraction * 100, 0.01)
-	file.store_string(JSON.stringify({"size_percent": int(percent) if percent == int(percent) else percent}, "\t") + "\n")
+	var data := {"size_percent": snappedf(side_fraction * 100, 0.01), "outline_percent": snappedf(outline_percent, 0.01)}
+	for key in data:
+		if data[key] == int(data[key]):
+			data[key] = int(data[key])  # keep whole numbers free of a trailing .0
+	file.store_string(JSON.stringify(data, "\t", false) + "\n")
 	return OK
 
 
@@ -208,12 +212,12 @@ func _on_focus_entered() -> void:
 	queue_redraw()
 
 
-## A closed outline PIECE_OUTLINE wide, with rounded corners so sharp points
+## A closed outline outline_percent wide, with rounded corners so sharp points
 ## like the star's stay joined.
 func _draw_hollow(outline: PackedVector2Array, color: Color) -> void:
-	draw_polyline(outline, color, PIECE_OUTLINE, true)
+	draw_polyline(outline, color, outline_percent, true)
 	for v in outline:
-		draw_circle(v, PIECE_OUTLINE / 2, color)
+		draw_circle(v, outline_percent / 2, color)
 
 
 ## The outline grown outward by offset (in 100x100 box units), closed and
