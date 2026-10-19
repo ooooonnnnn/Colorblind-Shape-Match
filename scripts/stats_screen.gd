@@ -20,15 +20,20 @@ const BASELINE_PLATE := {"background": Color("c9ccd3"), "colors": [Color("3b2f4a
 
 @onready var summary_label: Label = %Summary
 @onready var cards: VBoxContainer = %Cards
+@onready var scroll: ScrollContainer = $Margin/Rows/Scroll
 @onready var export_button: Button = %Export
 @onready var clear: Button = %Clear
 @onready var back: ToyButton = %Back
 
 var _clear_armed := false  # Clear asks for a second press before wiping the stats
 var _overlay: ColorRect  # the open details pop-out, or null
+var _details_scroll: ScrollContainer  # the pop-out's own scroll, while it is open
 
 
 func _ready() -> void:
+	var drag_scroll := DragScroll.new()  # drag anywhere to scroll the cards, or the open pop-out
+	drag_scroll.target = func(): return _details_scroll if _overlay else scroll
+	add_child(drag_scroll)
 	back.activated.connect(func():
 		await get_tree().create_timer(0.15).timeout  # let the button's pop play
 		get_tree().change_scene_to_file("res://menu.tscn")
@@ -230,13 +235,13 @@ func _open_details(summary: Dictionary, id: String, title: String, subtitle: Str
 	solid.shadow_size = 12
 	window.add_theme_stylebox_override("panel", solid)
 	_overlay.add_child(window)
-	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	window.add_child(scroll)
+	_details_scroll = ScrollContainer.new()
+	_details_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	window.add_child(_details_scroll)
 	var body := VBoxContainer.new()
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 14)
-	scroll.add_child(body)
+	_details_scroll.add_child(body)
 
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 24)

@@ -19,9 +19,6 @@ const REMOVE := Color("ffb4a2")
 const MUTED := Color(0.231373, 0.184314, 0.290196, 0.7)  # Icons.INK, for explanations
 const CHANNEL_NAMES := {"hue": "Hue", "saturation": "Saturation", "value": "Brightness"}
 const PART_NAMES := {"background": "Background dots", "shapes": "Shape dots"}
-const DRAG_SCROLL := 12.0  # px a press must travel before it counts as a scroll or a sideways drag
-
-enum {DECIDING, SCROLLING, PASSING}  # what a held-back press on a tab turned out to be
 
 @onready var tabs: TabContainer = %Tabs
 @onready var levels_page: VBoxContainer = %LevelsPage
@@ -54,11 +51,12 @@ var _previewed := ""  # the color group shown in the preview
 var _holes: Array[ShapeView] = []
 var _pieces: Array[ShapeView] = []
 var _saved_tween: Tween
-var _scroll_drag := {}  # {scroll, press, start, from, mode} from a press on a tab until it is let go
-var _replaying := false  # true while held-back events are sent on, so _input lets them by
 
 
 func _ready() -> void:
+	var drag_scroll := DragScroll.new()  # drag anywhere on a tab to scroll it
+	drag_scroll.target = func(): return tabs.get_current_tab_control() as ScrollContainer
+	add_child(drag_scroll)
 	_build_levels_page()
 	# Dots has loaded its settings by now, as children are ready first.
 	_build_dots_page()
@@ -71,58 +69,6 @@ func _ready() -> void:
 		get_tree().change_scene_to_file("res://menu.tscn")
 	)
 	save.pressed.connect(_save)
-
-
-# ---------- Drag to scroll ----------
-
-## Dragging up or down anywhere on a tab scrolls it, as a finger expects on a
-## tablet. ScrollContainer only scrolls from drags that reach it, and the cards,
-## pictures and controls inside stop them, so the page sorts presses out here
-## first. A press on a tab is held back until it shows what it is: moving
-## DRAG_SCROLL px mostly up or down scrolls the tab, and the press never reaches
-## the control under it (so scrolling over a slider does not move it); moving
-## sideways, or letting go, hands the press on to the control as if it had
-## never been held.
-func _input(event: InputEvent) -> void:
-	if _replaying:
-		return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		if event.pressed:
-			var scroll := tabs.get_current_tab_control() as ScrollContainer
-			if scroll and scroll.get_global_rect().has_point(event.position):
-				_scroll_drag = {"scroll": scroll, "press": event, "start": event.position,
-						"from": scroll.scroll_vertical, "mode": DECIDING}
-				get_viewport().set_input_as_handled()
-		elif not _scroll_drag.is_empty():
-			if _scroll_drag.mode == DECIDING:  # a tap
-				get_viewport().set_input_as_handled()
-				_replay.call_deferred([_scroll_drag.press, event])
-			elif _scroll_drag.mode == SCROLLING:  # nothing below saw the press
-				get_viewport().set_input_as_handled()
-			_scroll_drag = {}
-	elif event is InputEventMouseMotion and not _scroll_drag.is_empty():
-		var moved: Vector2 = event.position - _scroll_drag.start
-		match _scroll_drag.mode:
-			DECIDING:
-				get_viewport().set_input_as_handled()
-				if absf(moved.y) >= DRAG_SCROLL and absf(moved.y) >= absf(moved.x):
-					_scroll_drag.mode = SCROLLING
-					_scroll_drag.start = event.position  # scroll from here, without a jump
-					_scroll_drag.from = _scroll_drag.scroll.scroll_vertical
-				elif absf(moved.x) >= DRAG_SCROLL:
-					_scroll_drag.mode = PASSING
-					_replay.call_deferred([_scroll_drag.press, event])
-			SCROLLING:
-				get_viewport().set_input_as_handled()
-				_scroll_drag.scroll.scroll_vertical = int(_scroll_drag.from - moved.y)
-
-
-## Sends held-back events on to the controls, past _input.
-func _replay(events: Array) -> void:
-	_replaying = true
-	for e in events:
-		get_viewport().push_input(e, true)
-	_replaying = false
 
 
 # ---------- Building blocks ----------
