@@ -2,8 +2,6 @@
 	"levels": [
 		{ "duration": 0, "holes": 1, "shapes": 1, "repetitions": 2, "filter": false },
 		{ "duration": 0, "holes": 2, "shapes": 1, "repetitions": 2, "filter": true },
-		{ "duration": 15, "holes": 3, "shapes": 3, "repetitions": 3, "filter": true },
-		{ "duration": 20, "holes": 4, "shapes": 3, "repetitions": 3, "filter": true },
-		{ "duration": 25, "holes": 3, "shapes": 2, "repetitions": 0, "filter": true }
+		{ "duration": 30, "holes": 3, "shapes": 2, "repetitions": 0, "filter": true }
 	]
 }
