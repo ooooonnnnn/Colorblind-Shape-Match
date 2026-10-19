@@ -237,11 +237,11 @@ func end_game() -> void:
 func end_level(cleared: bool) -> void:
 	transitioning = true
 	deselect()
-	var delay := 1.2
+	var delay := 0.8
 	if cleared:
-		delay = 1.8
+		delay = 1.0
 		var rect := board.get_global_rect()
-		effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 1.1)
+		effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 0.4)
 		effects.confetti(rect)
 		fanfare.play()
 	else:
@@ -322,6 +322,7 @@ func select(p: ShapeView) -> void:
 	deselect()
 	selected = p
 	p.selected = true
+	effects.glow(p)
 	p.scale_to(1.12)
 
 
@@ -329,6 +330,7 @@ func deselect() -> void:
 	if selected:
 		selected.selected = false
 		selected.scale_to(1.0)
+		effects.glow(null)
 	selected = null
 
 
@@ -394,6 +396,7 @@ func _on_piece_input(event: InputEvent, p: ShapeView) -> void:
 			drag.moved = true
 			deselect()
 			p.dragging = true
+			effects.glow(p)
 			p.z_index = 3
 			p.scale_to(1.08)
 		if drag.moved:
@@ -409,6 +412,7 @@ func _end_drag() -> void:
 		return
 
 	p.dragging = false
+	effects.glow(null)
 	p.z_index = 2
 	p.scale_to(1.0)
 	if transitioning:

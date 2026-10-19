@@ -6,12 +6,16 @@ extends CanvasLayer
 
 const COLORS := [Color("ffd166"), Color("ff8fab"), Color("8fd3ff"), Color("b8f2a6"), Color("cdb4ff"), Color.WHITE]
 const GRAVITY := 900.0  # px/s², confetti only
+const GLOW_REACH := 22.0  # how far the glow fades out past a piece's outline, in 100x100 box units
+const GLOW_COLOR := Color(0.75, 0.88, 1.0)  # white with a touch of blue
+const GLOW_BANDS := 8
 
 ## Each: {pos, vel, spin, angle, size, color, life, age, star, falls}
 var _particles: Array[Dictionary] = []
 var _canvas := Node2D.new()
 var _star_node: Node2D
 var _star_tween: Tween
+var _glowing: ShapeView  # the picked-up piece, or null
 
 
 func _ready() -> void:
@@ -53,6 +57,7 @@ func cheer(center: Vector2, side: float, hold := 1.0, stay := false) -> void:
 	_star_node = Node2D.new()
 	_star_node.position = center
 	_star_node.scale = Vector2.ZERO
+	_star_node.rotation = -0.4
 	_star_node.draw.connect(func():
 		var points := Icons.star(side / 2, side * 0.24)
 		_star_node.draw_colored_polygon(points, Color("ffd166"))
@@ -64,11 +69,12 @@ func cheer(center: Vector2, side: float, hold := 1.0, stay := false) -> void:
 		_star_node.draw_arc(Vector2(0, side * 0.04), side * 0.07, 0.2, PI - 0.2, 16, Icons.INK, side * 0.025, true)
 	)
 	add_child(_star_node)
+	# Untwist while it springs in; bound to the star so it dies with it.
+	_star_node.create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT).tween_property(_star_node, "rotation", 0.0, 0.32)
 	_star_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	# Squash and stretch on the way in, then settle.
 	for s in [Vector2(1.3, 0.8), Vector2(0.9, 1.15), Vector2(1.05, 0.97), Vector2.ONE]:
-		_star_tween.tween_property(_star_node, "scale", s, 0.12)
-	_star_tween.parallel().tween_property(_star_node, "rotation", 0.0, 0.48).from(-0.4)
+		_star_tween.tween_property(_star_node, "scale", s, 0.08)
 	if stay:
 		_star_tween.tween_callback(func():
 			_star_tween = create_tween().set_loops().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -81,6 +87,14 @@ func cheer(center: Vector2, side: float, hold := 1.0, stay := false) -> void:
 		_star_tween.tween_callback(clear_star)
 
 
+## A faint bluish-white glow hugging a picked-up piece, so it is easy to keep track
+## of. It starts just outside the piece's outline, so the dots that draw the
+## piece stay uncovered.
+func glow(view: ShapeView) -> void:
+	_glowing = view
+	_canvas.queue_redraw()
+
+
 func clear_star() -> void:
 	if _star_tween:
 		_star_tween.kill()
@@ -90,6 +104,10 @@ func clear_star() -> void:
 
 
 func _process(delta: float) -> void:
+	if _glowing and not is_instance_valid(_glowing):
+		_glowing = null
+	if _glowing:
+		_canvas.queue_redraw()  # follows the piece as it moves and scales
 	if _particles.is_empty():
 		return
 	for p in _particles:
@@ -107,6 +125,14 @@ func _process(delta: float) -> void:
 
 
 func _draw_particles() -> void:
+	if _glowing:
+		var px := _glowing.size.x / 100.0 * _glowing.visual_scale  # canvas px per box unit
+		var reach := GLOW_REACH * (1.0 + 0.1 * sin(Time.get_ticks_msec() / 160.0))
+		var band := reach / GLOW_BANDS
+		for i in GLOW_BANDS:
+			var f := float(i) / GLOW_BANDS
+			for loop in _glowing.outline_around(ShapeView.PIECE_OUTLINE / 2 + band * (i + 0.5)):
+				_canvas.draw_polyline(loop, Color(GLOW_COLOR, 0.42 * (1.0 - f) * (1.0 - f)), band * px + 1.0, true)
 	for p in _particles:
 		var fade := clampf((p.life - p.age) / 0.3, 0.0, 1.0)
 		var color: Color = p.color

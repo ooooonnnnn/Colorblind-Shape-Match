@@ -216,11 +216,28 @@ func _draw_hollow(outline: PackedVector2Array, color: Color) -> void:
 		draw_circle(v, PIECE_OUTLINE / 2, color)
 
 
+## The outline grown outward by offset (in 100x100 box units), closed and
+## placed on the canvas as currently drawn, moves and squashes included.
+func outline_around(offset: float) -> Array[PackedVector2Array]:
+	var to_canvas := get_global_transform() * _shape_transform()
+	var loops: Array[PackedVector2Array] = []
+	for grown in Geometry2D.offset_polygon(_points, offset, Geometry2D.JOIN_ROUND):
+		var loop := to_canvas * grown
+		loop.append(loop[0])
+		loops.append(loop)
+	return loops
+
+
+func _shape_transform() -> Transform2D:
+	var k := size.x / 100.0
+	return Transform2D(tilt, Vector2(1 + squash, 1 - squash) * k * visual_scale * breath, 0, size / 2 + Vector2(shake_offset, 0))
+
+
 func _draw() -> void:
 	if _points.is_empty():
 		return
 	var k := size.x / 100.0
-	draw_set_transform(size / 2 + Vector2(shake_offset, 0), tilt, Vector2(1 + squash, 1 - squash) * k * visual_scale * breath)
+	draw_set_transform_matrix(_shape_transform())
 	var outline := _points.duplicate()
 	outline.append(_points[0])
 
