@@ -1,0 +1,30 @@
+{
+	"background": {
+		"hue": {
+			"wavelength": 10,
+			"amplitude": 0.04
+		},
+		"saturation": {
+			"wavelength": 10,
+			"amplitude": 0.15
+		},
+		"value": {
+			"wavelength": 10,
+			"amplitude": 0.2
+		}
+	},
+	"shapes": {
+		"hue": {
+			"wavelength": 10,
+			"amplitude": 0.04
+		},
+		"saturation": {
+			"wavelength": 10,
+			"amplitude": 0.15
+		},
+		"value": {
+			"wavelength": 10,
+			"amplitude": 0.2
+		}
+	}
+}

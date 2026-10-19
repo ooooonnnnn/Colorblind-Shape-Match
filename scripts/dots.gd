@@ -1,15 +1,19 @@
 extends CanvasLayer
 ## Redraws the area rectangle, except the mask rectangle, as non-overlapping
 ## circles. Each circle shows the background color, or a shape's color while
-## that shape's piece is under its center.
+## that shape's piece is under its center, with its hue, saturation and value
+## shifted by Perlin noise (see NOISE_PATH).
 ## The circles are packed once per area and mask position; which base color
 ## each one uses follows the screen live.
 
 signal colors_changed  ## a base color was edited, e.g. in the inspector while running
 
 const CONFIG_PATH := "res://dots.json"
+const NOISE_PATH := "res://noise.json"
 const MIN_RADIUS := 1.0     # px; spots that only fit a smaller circle are skipped
 const CELL := 4.0          # px; side of the cells used to track where free space is left
+const NOISE_PARTS := {"background": "background", "shapes": "shape"}  # NOISE_PATH key: shader uniform prefix
+const NOISE_CHANNELS := ["hue", "saturation", "value"]
 
 @export var area: Control  ## the part of the screen the circles fill
 @export var mask: Control  ## stays clear of circles
@@ -26,6 +30,8 @@ const CELL := 4.0          # px; side of the cells used to track where free spac
 var max_radius := 14.0  # px
 var gap := 3.0          # px between neighbouring circles
 var fill := 0.5         # fraction of the area outside the mask to cover
+## {part: {channel: {wavelength, amplitude}}} for each NOISE_PARTS key and NOISE_CHANNELS entry
+var noise := {}
 
 var _background := ColorRect.new()
 var _circles := MultiMeshInstance2D.new()
@@ -52,8 +58,10 @@ func _ready() -> void:
 	_circles.material = circle_material
 	_circles.multimesh = MultiMesh.new()
 	_circles.multimesh.transform_format = MultiMesh.TRANSFORM_2D
+	_circles.multimesh.use_custom_data = true
 	_circles.multimesh.mesh = quad
 	add_child(_circles)
+	_load_noise()
 
 
 func _load_config() -> void:
@@ -81,6 +89,57 @@ func save_config() -> Error:
 	for key in data:
 		if data[key] == int(data[key]):
 			data[key] = int(data[key])  # keep whole numbers free of a trailing .0
+	file.store_string(JSON.stringify(data, "\t", false) + "\n")
+	return OK
+
+
+func _load_noise() -> void:
+	var data = JSON.parse_string(FileAccess.get_file_as_string(NOISE_PATH))
+	if not data is Dictionary:
+		push_error("Bad or missing noise config in %s" % NOISE_PATH)
+		data = {}
+	apply_noise(data)
+
+
+## Takes the H, S and V noises' wavelength and amplitude, separately for the
+## background and the shapes, shaped like NOISE_PATH; missing values keep their
+## current one (wavelength 1, amplitude 0 at first). The circles show it at once.
+func apply_noise(data: Dictionary) -> void:
+	for part in NOISE_PARTS:
+		var channels = data.get(part)
+		if not channels is Dictionary:
+			channels = {}
+		if not noise.has(part):
+			noise[part] = {}
+		var wavelength := Vector3.ONE
+		var amplitude := Vector3.ZERO
+		for i in NOISE_CHANNELS.size():
+			var channel: String = NOISE_CHANNELS[i]
+			var current: Dictionary = noise[part].get(channel, {"wavelength": 1.0, "amplitude": 0.0})
+			var given = channels.get(channel)
+			if not given is Dictionary:
+				given = {}
+			wavelength[i] = maxf(1.0, float(given.get("wavelength", current.wavelength)))
+			amplitude[i] = float(given.get("amplitude", current.amplitude))
+			noise[part][channel] = {"wavelength": wavelength[i], "amplitude": amplitude[i]}
+		_circles.material.set_shader_parameter(NOISE_PARTS[part] + "_wavelength", wavelength)
+		_circles.material.set_shader_parameter(NOISE_PARTS[part] + "_amplitude", amplitude)
+
+
+func save_noise() -> Error:
+	var file := FileAccess.open(NOISE_PATH, FileAccess.WRITE)
+	if file == null:
+		return FileAccess.get_open_error()
+	var data := {}
+	for part in NOISE_PARTS:
+		data[part] = {}
+		for channel in NOISE_CHANNELS:
+			var wavelength: float = noise[part][channel].wavelength
+			data[part][channel] = {
+				# Keep whole numbers free of a trailing .0.
+				"wavelength": int(wavelength) if wavelength == int(wavelength) else wavelength,
+				"amplitude": snappedf(noise[part][channel].amplitude, 0.001),
+			}
 	file.store_string(JSON.stringify(data, "\t", false) + "\n")
 	return OK
 
@@ -204,3 +263,4 @@ func _show(circles: PackedVector3Array) -> void:
 	for i in circles.size():
 		var c := circles[i]
 		mm.set_instance_transform_2d(i, Transform2D(0, Vector2.ONE * c.z * 2, 0, Vector2(c.x, c.y)))
+		mm.set_instance_custom_data(i, Color(c.x, c.y, 0, 0))  # center, for the noise

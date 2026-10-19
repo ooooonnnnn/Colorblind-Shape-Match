@@ -127,6 +127,19 @@ layout_mode = 2
 value = 80.0
 suffix = "%"
 
+[node name="NoiseTitle" type="Label" parent="Margin/Columns/Settings"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
+theme_override_font_sizes/font_size = 22
+text = "Dot color noise"
+
+[node name="Noise" type="GridContainer" parent="Margin/Columns/Settings"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 8
+columns = 5
+
 [node name="ShapesTitle" type="Label" parent="Margin/Columns/Settings"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
