@@ -183,7 +183,7 @@ func new_level() -> void:
 	_chime_step = 0
 	level_num += 1
 	effects.clear_star()
-	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups))
+	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups, config.colors))
 	dots.show_group(group)
 	_level_group = group.id if config.filter else Stats.BASELINE
 	hole_count = config.holes

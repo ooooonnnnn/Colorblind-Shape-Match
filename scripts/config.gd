@@ -13,7 +13,7 @@ const LIGHTNESS_OK := Color("4caf7a")
 const LIGHTNESS_OFF := Color("e8a33d")
 const PREVIEW_SPACING := 16.0  # px between neighbouring preview shapes
 const TRAY_PADDING := 24.0     # px between the holes and the tray edge, as in the game
-const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1, "filter": true}
+const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1, "filter": true, "colors": "random"}
 const BADGE := Color("ffd166")
 const REMOVE := Color("ffb4a2")
 const MUTED := Color(0.231373, 0.184314, 0.290196, 0.7)  # Icons.INK, for explanations
@@ -39,9 +39,8 @@ var _size_slider: HSlider
 var _outline_slider: HSlider
 var _board_color := ColorPickerButton.new()
 var _groups := {}  # see ColorGroups.load_settings
-var _cards := {}  # {group id: {group, plate, status, bars: lightness bar per figure color}}
+var _cards := {}  # {group id: {group, plate, bars: lightness bar per figure color}}
 var _mode_buttons: Array[Button] = []  # article, custom
-var _play_group := OptionButton.new()
 var _groups_note := Label.new()
 var _restore_groups := Button.new()
 var _group_list := VBoxContainer.new()
@@ -53,6 +52,7 @@ var _saved_tween: Tween
 
 
 func _ready() -> void:
+	_groups = ColorGroups.load_settings()  # the level cards offer its groups
 	_build_levels_page()
 	# Dots has loaded its settings by now, as children are ready first.
 	_build_dots_page()
@@ -196,12 +196,24 @@ func _add_row(entry: Dictionary) -> void:
 		"forever": _switch("Plays forever", entry.repetitions <= 0),
 		"repetitions": Stepper.new("Times to play", 1, 99, entry.repetitions if entry.repetitions > 0 else 1),
 		"filter": _switch("Dots filter", entry.filter),
+		"colors": OptionButton.new(),
 	}
+	row.colors.set_meta("choice", entry.colors)
+	_fill_color_choices(row.colors)
+	row.colors.item_selected.connect(func(index):
+		row.colors.set_meta("choice", row.colors.get_item_metadata(index))
+		if row.colors.get_meta("choice") != ColorGroups.RANDOM:
+			_preview_group(row.colors.get_meta("choice"))
+		_refresh_rows()
+	)
+	var colors_label := Label.new()
+	colors_label.text = "Colors"
 	controls.add_child(row.holes)
 	controls.add_child(row.shapes)
 	controls.add_child(_stack([row.time_on, row.duration]))
 	controls.add_child(_stack([row.forever, row.repetitions]))
 	controls.add_child(_stack([row.filter]))
+	controls.add_child(_stack([colors_label, row.colors]))
 	for stepper in [row.holes, row.shapes, row.duration, row.repetitions]:
 		stepper.changed.connect(func(_v): _refresh_rows())
 	for switch in [row.time_on, row.forever, row.filter]:
@@ -245,6 +257,24 @@ func _remove_row(row: Dictionary) -> void:
 	_refresh_rows()
 
 
+## Offers "Random" and each color group in the Colors tab, keeping the one
+## chosen (kept in the "choice" meta), or falling back to random if that group
+## is gone.
+func _fill_color_choices(choices: OptionButton) -> void:
+	var choice: String = choices.get_meta("choice", ColorGroups.RANDOM)
+	choices.clear()
+	choices.add_item("Random each level")
+	choices.set_item_metadata(0, ColorGroups.RANDOM)
+	for group in ColorGroups.active(_groups):
+		choices.add_item("%s (%s)" % [group.name, group.kind])
+		choices.set_item_metadata(choices.item_count - 1, group.id)
+	choices.selected = 0
+	for i in choices.item_count:
+		if choices.get_item_metadata(i) == choice:
+			choices.selected = i
+	choices.set_meta("choice", choices.get_item_metadata(choices.selected))
+
+
 ## Renumbers the cards, redraws their pictures and sentences, and fades the
 ## ones that can never be reached because an earlier one plays forever.
 func _refresh_rows() -> void:
@@ -260,11 +290,13 @@ func _refresh_rows() -> void:
 		row.duration.editable = row.time_on.button_pressed
 		row.repetitions.editable = not row.forever.button_pressed
 		row.remove.disabled = _rows.size() == 1
-		row.summary.text = "%d %s, %d %s for each.\n%s · %s · %s" % [
+		row.summary.text = "%d %s, %d %s for each.\n%s · %s · %s · %s" % [
 				holes, "hole" if holes == 1 else "holes", pieces, "piece" if pieces == 1 else "pieces",
 				"%d seconds per level" % row.duration.value if row.time_on.button_pressed else "No time limit",
 				"plays forever" if row.forever.button_pressed else ("plays once" if row.repetitions.value == 1 else "plays %d times" % row.repetitions.value),
-				"dots on" if row.filter.button_pressed else "no dots"]
+				"dots on" if row.filter.button_pressed else "no dots",
+				row.colors.get_item_text(row.colors.selected).to_lower() if row.colors.get_meta("choice") == ColorGroups.RANDOM
+						else "%s colors" % row.colors.get_item_text(row.colors.selected).get_slice(" (", 0)]
 		var reached := endless_at < 0
 		row.card.modulate.a = 1.0 if reached else 0.5
 		row.unreached.visible = not reached
@@ -282,6 +314,7 @@ func _levels() -> Array[Dictionary]:
 			"shapes": int(row.shapes.value),
 			"repetitions": 0 if row.forever.button_pressed else int(row.repetitions.value),
 			"filter": row.filter.button_pressed,
+			"colors": row.colors.get_meta("choice"),
 		})
 	return levels
 
@@ -380,9 +413,8 @@ func _on_outline_changed() -> void:
 # ---------- Color groups ----------
 
 func _build_colors_page() -> void:
-	_groups = ColorGroups.load_settings()
 	var choose := _card(colors_page, "Which colors",
-			"Each group is made for one type of color blindness: its piece colors blend into its background for that type. Hover a group for details.")
+			"Each group is made for one type of color blindness: its piece colors blend into its background for that type. These are the groups the level sequences can use. Hover a group for details.")
 	var modes := HBoxContainer.new()
 	modes.add_theme_constant_override("separation", 10)
 	var group := ButtonGroup.new()
@@ -396,14 +428,6 @@ func _build_colors_page() -> void:
 		modes.add_child(b)
 		_mode_buttons.append(b)
 	choose.add_child(modes)
-	var play_row := HBoxContainer.new()
-	play_row.add_theme_constant_override("separation", 12)
-	var play_label := Label.new()
-	play_label.text = "Play with"
-	play_row.add_child(play_label)
-	play_row.add_child(_play_group)
-	_play_group.item_selected.connect(_on_play_group_selected)
-	choose.add_child(play_row)
 	_groups_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_groups_note.add_theme_font_size_override("font_size", 16)
 	_groups_note.add_theme_color_override("font_color", MUTED)
@@ -421,13 +445,6 @@ func _build_colors_page() -> void:
 func _on_color_mode_selected(index: int) -> void:
 	_groups.custom = index == 1
 	_rebuild_groups()
-
-
-func _on_play_group_selected(index: int) -> void:
-	_groups.play = _play_group.get_item_metadata(index)
-	_update_cards()
-	if _groups.play != ColorGroups.RANDOM:
-		_preview_group(_groups.play)
 
 
 func _on_restore_groups() -> void:
@@ -450,13 +467,14 @@ func _remove_color(group: Dictionary, i: int) -> void:
 	_rebuild_groups()
 
 
-## Refills the play choices and the group cards from the groups in use, after
-## the mode changed or groups or colors were added, deleted or restored.
+## Refills the group cards, and the level cards' color choices, from the
+## groups in use, after the mode changed or groups or colors were added,
+## deleted or restored.
 func _rebuild_groups() -> void:
 	var groups := ColorGroups.active(_groups)
-	if _groups.play != ColorGroups.RANDOM and ColorGroups.find(_groups, _groups.play).is_empty():
-		_groups.play = groups[0].id
-	_fill_play_choices()
+	for row in _rows:
+		_fill_color_choices(row.colors)
+	_refresh_rows()
 	_groups_note.text = ("These are your own colors: click a color to change it, + to add a piece color and × to remove one." if _groups.custom
 			else "These colors come from the research and can't be changed. Pick \"My own colors\" to edit a copy of them.")
 	_restore_groups.visible = _groups.custom
@@ -470,18 +488,6 @@ func _rebuild_groups() -> void:
 	if ColorGroups.find(_groups, _previewed).is_empty():
 		_previewed = ColorGroups.pick(_groups)
 	_preview_group(_previewed)
-
-
-func _fill_play_choices() -> void:
-	_play_group.clear()
-	for group in ColorGroups.active(_groups):
-		_play_group.add_item("%s (%s)" % [group.name, group.kind])
-		_play_group.set_item_metadata(_play_group.item_count - 1, group.id)
-	_play_group.add_item("A random group each level")
-	_play_group.set_item_metadata(_play_group.item_count - 1, ColorGroups.RANDOM)
-	for i in _play_group.item_count:
-		if _play_group.get_item_metadata(i) == _groups.play:
-			_play_group.selected = i
 
 
 ## One group: a mini plate in its colors, what it tests, and its swatches, each
@@ -509,10 +515,6 @@ func _add_card(group: Dictionary, group_count: int) -> void:
 	name_label.text = group.name
 	name_label.add_theme_font_size_override("font_size", 22)
 	title.add_child(name_label)
-	var status := Label.new()
-	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	title.add_child(status)
 	middle.add_child(title)
 	middle.add_child(_note("%s · %s" % [group.kind, group.prevalence]))
 
@@ -558,7 +560,7 @@ func _add_card(group: Dictionary, group_count: int) -> void:
 	row.add_child(buttons)
 
 	_group_list.add_child(card)
-	_cards[group.id] = {"group": group, "plate": plate, "status": status, "bars": bars}
+	_cards[group.id] = {"group": group, "plate": plate, "bars": bars}
 
 
 ## A color picker for group's background (i = -1) or its piece color i, over
@@ -590,17 +592,13 @@ func _on_group_color_changed(color: Color, group: Dictionary, i: int) -> void:
 	_preview_group(group.id)
 
 
-## Refreshes each card's plate, play status and lightness bars.
+## Refreshes each card's plate and lightness bars.
 func _update_cards() -> void:
 	for id in _cards:
 		var card: Dictionary = _cards[id]
 		var group: Dictionary = card.group
 		card.plate.background = group.background
 		card.plate.colors = group.colors
-		if _groups.play == ColorGroups.RANDOM:
-			card.status.text = "In the random mix"
-		else:
-			card.status.text = "Playing now" if _groups.play == id else ""
 		var background_l := ColorGroups.lightness(group.background)
 		for i in card.bars.size():
 			var l := ColorGroups.lightness(group.colors[i])

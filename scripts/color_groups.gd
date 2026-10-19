@@ -5,8 +5,9 @@ extends RefCounted
 ## colors from the palette, more of it the more pieces a level has (see
 ## piece_colors). ARTICLE holds the groups taken from the research articles and
 ## never changes; color_groups.json holds whether those or the player's own copy
-## (recolored, with colors added or removed, or groups deleted) is used, and
-## which group is played.
+## (recolored, with colors added or removed, or groups deleted) is used. These
+## are the groups available; each level sequence picks one of them or a random
+## one (see LevelConfig).
 ##
 ## Sources: "Advanced Colorimetry Protocols and Design in Color Vision
 ## Deficiency Diagnosis for Children Using Pseudoisochromatic Plates" (confusion
@@ -15,7 +16,7 @@ extends RefCounted
 ## so no piece stands out by brightness alone, as the first article requires.
 
 const PATH := "res://color_groups.json"
-const RANDOM := "random"  # the play setting that picks a new group every level
+const RANDOM := "random"  # a level sequence's colors setting that picks a new group every level
 const MAX_COLORS := 6  # figure colors per group; must match BASE_COUNT - 1 in dot_circle.gdshader
 const LIGHTNESS_TOLERANCE := 5.0  # CIELAB L* a color may differ from its background before it shows by brightness
 
@@ -55,8 +56,7 @@ static func article_copy() -> Array:
 	return ARTICLE.duplicate(true)
 
 
-## {custom: bool, play: group id or RANDOM, groups: the player's own groups,
-## each like an ARTICLE entry}.
+## {custom: bool, groups: the player's own groups, each like an ARTICLE entry}.
 static func load_settings() -> Dictionary:
 	var data = JSON.parse_string(FileAccess.get_file_as_string(PATH)) if FileAccess.file_exists(PATH) else {}
 	if not data is Dictionary:
@@ -83,10 +83,7 @@ static func load_settings() -> Dictionary:
 			})
 	if groups.is_empty():
 		groups = article_copy()
-	var settings := {"custom": data.get("mode") == "custom", "play": str(data.get("play", ARTICLE[0].id)), "groups": groups}
-	if settings.play != RANDOM and find(settings, settings.play).is_empty():
-		settings.play = active(settings)[0].id
-	return settings
+	return {"custom": data.get("mode") == "custom", "groups": groups}
 
 
 static func save_settings(settings: Dictionary) -> Error:
@@ -98,7 +95,7 @@ static func save_settings(settings: Dictionary) -> Error:
 			"background": "#" + group.background.to_html(false),
 			"colors": group.colors.map(func(c): return "#" + c.to_html(false)),
 		})
-	var data := {"mode": "custom" if settings.custom else "article", "play": settings.play, "custom_groups": groups}
+	var data := {"mode": "custom" if settings.custom else "article", "custom_groups": groups}
 	var file := FileAccess.open(PATH, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
@@ -126,9 +123,10 @@ static func find(settings: Dictionary, id: String) -> Dictionary:
 	return {}
 
 
-## The id of the group to play next: the chosen one, or a random one.
-static func pick(settings: Dictionary) -> String:
-	var group := find(settings, settings.play)
+## The id of the group to play: choice, if it is a group in use, or else (as
+## for RANDOM) a random one of them.
+static func pick(settings: Dictionary, choice := RANDOM) -> String:
+	var group := find(settings, choice)
 	if group.is_empty():
 		group = active(settings).pick_random()
 	return group.id
