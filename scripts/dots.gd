@@ -13,6 +13,22 @@ const NOISE_PATH := "res://noise.json"
 const ColorGroups := preload("res://scripts/color_groups.gd")
 const MIN_RADIUS := 1.0     # px; spots that only fit a smaller circle are skipped
 const DEFAULT_BOARD_COLOR := Color("dde6ef")  # a soft blue-gray, like the paper of a printed plate
+## The plate-like starting point for CONFIG_PATH and NOISE_PATH, which the
+## config page's reset goes back to. The noise is the same for figure and
+## background, so only hue tells them apart.
+const DEFAULT_CONFIG := {"max_radius": 6.0, "gap": 1.0, "fill_percent": 50.0}
+const DEFAULT_NOISE := {
+	"background": {
+		"hue": {"wavelength": 10.0, "amplitude": 0.02},
+		"saturation": {"wavelength": 10.0, "amplitude": 0.05},
+		"value": {"wavelength": 10.0, "amplitude": 0.15},
+	},
+	"shapes": {
+		"hue": {"wavelength": 10.0, "amplitude": 0.02},
+		"saturation": {"wavelength": 10.0, "amplitude": 0.05},
+		"value": {"wavelength": 10.0, "amplitude": 0.15},
+	},
+}
 const CELL := 4.0          # px; side of the cells used to track where free space is left
 const NOISE_PARTS := {"background": "background", "shapes": "shape"}  # NOISE_PATH key: shader uniform prefix
 const NOISE_CHANNELS := ["hue", "saturation", "value"]
@@ -33,9 +49,9 @@ const NOISE_CHANNELS := ["hue", "saturation", "value"]
 ## The colors pieces are filled with, at most ColorGroups.MAX_COLORS.
 @export var figure_colors := PackedColorArray([Color("e0655e"), Color("d76d49"), Color("c47a3e"), Color("bc72b3"), Color("d1689b")])
 
-var max_radius := 6.0   # px
-var gap := 1.0          # px between neighbouring circles
-var fill := 0.5         # fraction of the area outside the mask to cover
+var max_radius: float = DEFAULT_CONFIG.max_radius  # px
+var gap: float = DEFAULT_CONFIG.gap                # px between neighbouring circles
+var fill: float = DEFAULT_CONFIG.fill_percent / 100  # fraction of the area outside the mask to cover
 ## {part: {channel: {wavelength, amplitude}}} for each NOISE_PARTS key and NOISE_CHANNELS entry
 var noise := {}
 
