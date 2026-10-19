@@ -12,6 +12,11 @@ extends RefCounted
 ##            counts time the player was free to look, so time spent handling
 ##            other pieces is never included (see main.gd)
 ##   wrong    drops on a wrong hole
+##   moved    whether it was moved from where it started (dragged, or placed)
+##   at_ms    when it was placed, in ms since the game scene opened, or -1
+##
+## Beside the records, PATH keeps each session's details (see add), for the
+## CSV export.
 ##
 ## The reading follows "Advanced Colorimetry Protocols and Design in Color
 ## Vision Deficiency Diagnosis for Children Using Pseudoisochromatic Plates":
@@ -45,33 +50,98 @@ const GROUP_NOTES := {
 
 
 static func load_records() -> Array:
-	if not FileAccess.file_exists(PATH):
-		return []
-	var data = JSON.parse_string(FileAccess.get_file_as_string(PATH))
-	if not (data is Dictionary and data.get("pieces") is Array):
-		push_error("Bad stats file %s" % PATH)
-		return []
-	return data.pieces
+	return _load().pieces
 
 
-static func add(records: Array) -> void:
-	if records.is_empty():
+## {session id (as text): details}, see add.
+static func load_sessions() -> Dictionary:
+	return _load().sessions
+
+
+## Saves records, and if given, the details of their session: {start (unix
+## time, the session id), end (unix time), board_color, backgrounds: {group id:
+## background dot color}, noise (as Dots.noise), size_percent}.
+static func add(records: Array, session := {}) -> void:
+	if records.is_empty() and session.is_empty():
 		return
-	var all := load_records()
-	all.append_array(records)
-	_write(all)
+	var data := _load()
+	data.pieces.append_array(records)
+	if not session.is_empty():
+		data.sessions[str(session.start)] = session
+	_write(data)
 
 
 static func clear() -> void:
-	_write([])
+	_write({"pieces": [], "sessions": {}})
 
 
-static func _write(records: Array) -> void:
+static func _load() -> Dictionary:
+	var data = JSON.parse_string(FileAccess.get_file_as_string(PATH)) if FileAccess.file_exists(PATH) else {}
+	if not (data is Dictionary and data.get("pieces", []) is Array):
+		push_error("Bad stats file %s" % PATH)
+		data = {}
+	var sessions = data.get("sessions")
+	return {"pieces": data.get("pieces", []), "sessions": sessions if sessions is Dictionary else {}}
+
+
+## Every session as a block of CSV: a header section with its start and end
+## (local time), board color, background dot colors, background and shape
+## noise and shape size, then a row per piece: its shape and color, whether it
+## was moved from where it started, and when it was placed, counted from the
+## start of the game. Details recorded before they were kept read "unknown".
+static func to_csv(records: Array, sessions: Dictionary) -> String:
+	var by_session := {}
+	for r in records:
+		by_session.get_or_add(str(int(r.session)), []).append(r)
+	var ids := by_session.keys()
+	ids.sort_custom(func(a, b): return int(a) < int(b))
+	var lines := PackedStringArray()
+	for id in ids:
+		var s: Dictionary = sessions.get(id, {})
+		lines.append("Session start,%s" % _local_time(int(id)))
+		lines.append("Session end,%s" % (_local_time(int(s.end)) if s.has("end") else "unknown"))
+		lines.append("Board color,%s" % s.get("board_color", "unknown"))
+		var backgrounds: Dictionary = s.get("backgrounds", {})
+		if backgrounds.is_empty():
+			lines.append("Background dot color,%s" % ("none (filter off)" if s.has("backgrounds") else "unknown"))
+		for group in backgrounds:
+			lines.append("Background dot color (%s),%s" % [group, backgrounds[group]])
+		for part in [["background", "Background"], ["shapes", "Shape"]]:
+			for channel in ["hue", "saturation", "value"]:
+				var noise: Dictionary = s.get("noise", {}).get(part[0], {}).get(channel, {})
+				lines.append("%s noise %s amplitude,%s" % [part[1], channel, _number(noise.get("amplitude"))])
+				lines.append("%s noise %s wavelength (px),%s" % [part[1], channel, _number(noise.get("wavelength"))])
+		lines.append("Shape size (%% of the board's shorter side),%s" % _number(s.get("size_percent")))
+		lines.append("")
+		lines.append("Shape,Color,Moved from original position,Time from game start (s)")
+		for r in by_session[id]:
+			var at_ms := int(r.get("at_ms", -1))
+			lines.append(",".join(PackedStringArray([
+				r.shape,
+				"#" + str(r.color),
+				("yes" if r.moved else "no") if r.has("moved") else "unknown",
+				("%.1f" % (at_ms / 1000.0) if at_ms >= 0 else "not placed") if r.has("at_ms") else "unknown",
+			])))
+		lines.append("")
+	return "\n".join(lines)
+
+
+static func _local_time(unix: int) -> String:
+	return Time.get_datetime_string_from_unix_time(unix + Time.get_time_zone_from_system().bias * 60, true)
+
+
+static func _number(value) -> String:
+	if value == null:
+		return "unknown"
+	return str(int(value)) if float(value) == int(value) else str(snappedf(value, 0.001))
+
+
+static func _write(data: Dictionary) -> void:
 	var file := FileAccess.open(PATH, FileAccess.WRITE)
 	if file == null:
 		push_error("Could not save stats: %s" % error_string(FileAccess.get_open_error()))
 		return
-	file.store_string(JSON.stringify({"pieces": records}))
+	file.store_string(JSON.stringify(data))
 
 
 ## {sessions, pieces, usual_ms, late_ms, groups: {group id: summary}} where
