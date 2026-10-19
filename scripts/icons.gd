@@ -3,6 +3,8 @@ class_name Icons
 ## stay crisp at any size. Each fits a box of the given side centered on center.
 
 const INK := Color("3b2f4a")  # outline around icons, dark enough to read on any pastel
+const PLUS := [[-0.2, -0.75], [0.2, -0.75], [0.2, -0.2], [0.75, -0.2], [0.75, 0.2], [0.2, 0.2], [0.2, 0.75],
+		[-0.2, 0.75], [-0.2, 0.2], [-0.75, 0.2], [-0.75, -0.2], [-0.2, -0.2]]
 
 
 static func draw(canvas: CanvasItem, icon: String, center: Vector2, side: float, color: Color) -> void:
@@ -32,6 +34,14 @@ static func _parts(icon: String, side: float) -> Array[PackedVector2Array]:
 			return [_scaled([[-0.85, 0.8], [-0.85, 0.05], [-0.35, 0.05], [-0.35, 0.8]], h),
 					_scaled([[-0.25, 0.8], [-0.25, -0.75], [0.25, -0.75], [0.25, 0.8]], h),
 					_scaled([[0.35, 0.8], [0.35, -0.3], [0.85, -0.3], [0.85, 0.8]], h)]
+		"plus":
+			return [_scaled(PLUS, h)]
+		"minus":
+			return [_scaled([[-0.75, -0.2], [0.75, -0.2], [0.75, 0.2], [-0.75, 0.2]], h)]
+		"cross":
+			return [Transform2D(PI / 4, Vector2.ZERO) * _scaled(PLUS, h)]
+		"check":
+			return [_scaled([[-0.8, 0.0], [-0.5, -0.3], [-0.2, 0.0], [0.5, -0.7], [0.8, -0.4], [-0.2, 0.6]], h)]
 		"gear":
 			var gear := PackedVector2Array()
 			for i in 32:

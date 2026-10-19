@@ -1,5 +1,6 @@
 [gd_scene format=3]
 
+[ext_resource type="Theme" path="res://ui_theme.tres" id="0_theme"]
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/timer_bar.gd" id="2_timer"]
 [ext_resource type="AudioStream" path="res://sounds/uh_uh.mp3" id="4_uh_uh"]
@@ -15,16 +16,8 @@
 [ext_resource type="AudioStream" path="res://sounds/fanfare.wav" id="14_fanfare"]
 [ext_resource type="AudioStream" path="res://sounds/finale.wav" id="15_finale"]
 
-[sub_resource type="SystemFont" id="Font_round"]
-font_names = PackedStringArray("Arial Rounded MT Bold", "Comic Sans MS", "Sans-Serif")
-
-[sub_resource type="Theme" id="Theme_ui"]
-default_font = SubResource("Font_round")
-default_font_size = 16
-Label/colors/font_color = Color(0.231373, 0.184314, 0.290196, 1)
-
 [sub_resource type="StyleBoxFlat" id="StyleBox_board"]
-bg_color = Color(0.145098, 0.164706, 0.215686, 1)
+bg_color = Color(0.968627, 0.945098, 0.890196, 1)
 border_width_left = 10
 border_width_top = 10
 border_width_right = 10
@@ -61,7 +54,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme = SubResource("Theme_ui")
+theme = ExtResource("0_theme")
 script = ExtResource("1_main")
 
 [node name="Background" type="ColorRect" parent="."]
