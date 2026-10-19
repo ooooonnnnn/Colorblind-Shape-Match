@@ -1,44 +1,58 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/timer_bar.gd" id="2_timer"]
 [ext_resource type="AudioStream" path="res://sounds/uh_uh.mp3" id="4_uh_uh"]
 [ext_resource type="AudioStream" path="res://sounds/chime.mp3" id="5_chime"]
 [ext_resource type="Script" path="res://scripts/dots.gd" id="6_dots"]
+[ext_resource type="Script" path="res://scripts/toy_button.gd" id="7_toy_button"]
+[ext_resource type="Script" path="res://scripts/progress_pips.gd" id="8_pips"]
+[ext_resource type="Script" path="res://scripts/star_badge.gd" id="9_star"]
+[ext_resource type="Script" path="res://scripts/effects.gd" id="10_effects"]
+[ext_resource type="AudioStream" path="res://sounds/pop.wav" id="11_pop"]
+[ext_resource type="AudioStream" path="res://sounds/boing.wav" id="12_boing"]
+[ext_resource type="AudioStream" path="res://sounds/whoosh.wav" id="13_whoosh"]
+[ext_resource type="AudioStream" path="res://sounds/fanfare.wav" id="14_fanfare"]
+[ext_resource type="AudioStream" path="res://sounds/finale.wav" id="15_finale"]
+
+[sub_resource type="SystemFont" id="Font_round"]
+font_names = PackedStringArray("Arial Rounded MT Bold", "Comic Sans MS", "Sans-Serif")
 
 [sub_resource type="Theme" id="Theme_ui"]
+default_font = SubResource("Font_round")
 default_font_size = 16
-Label/colors/font_color = Color(0.603922, 0.639216, 0.709804, 1)
+Label/colors/font_color = Color(0.231373, 0.184314, 0.290196, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_board"]
 bg_color = Color(0.145098, 0.164706, 0.215686, 1)
-corner_radius_top_left = 16
-corner_radius_top_right = 16
-corner_radius_bottom_right = 16
-corner_radius_bottom_left = 16
+border_width_left = 10
+border_width_top = 10
+border_width_right = 10
+border_width_bottom = 10
+border_color = Color(1, 0.980392, 0.941176, 1)
+corner_radius_top_left = 26
+corner_radius_top_right = 26
+corner_radius_bottom_right = 26
+corner_radius_bottom_left = 26
+expand_margin_left = 10.0
+expand_margin_top = 10.0
+expand_margin_right = 10.0
+expand_margin_bottom = 10.0
+shadow_color = Color(0.231373, 0.184314, 0.290196, 0.2)
+shadow_size = 6
+shadow_offset = Vector2(0, 5)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_tray"]
-bg_color = Color(0.105882, 0.121569, 0.164706, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.231373, 0.258824, 0.329412, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-
-[sub_resource type="StyleBoxFlat" id="StyleBox_toast"]
-content_margin_left = 24.0
-content_margin_top = 12.0
-content_margin_right = 24.0
-content_margin_bottom = 12.0
-bg_color = Color(0, 0, 0, 0.75)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
+bg_color = Color(1, 0.952941, 0.839216, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.956863, 0.721569, 0.376471, 1)
+corner_radius_top_left = 22
+corner_radius_top_right = 22
+corner_radius_bottom_right = 22
+corner_radius_bottom_left = 22
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -50,53 +64,61 @@ grow_vertical = 2
 theme = SubResource("Theme_ui")
 script = ExtResource("1_main")
 
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.74902, 0.898039, 1, 1)
+
 [node name="Content" type="VBoxContainer" parent="."]
 layout_mode = 0
-offset_left = 16.0
-offset_top = 12.0
-offset_right = 656.0
+offset_left = 24.0
+offset_top = 16.0
+offset_right = 664.0
 offset_bottom = 800.0
-theme_override_constants/separation = 8
+theme_override_constants/separation = 12
 
 [node name="Header" type="HBoxContainer" parent="Content"]
+custom_minimum_size = Vector2(0, 72)
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 16
 
-[node name="LevelCaption" type="Label" parent="Content/Header"]
+[node name="Home" type="Button" parent="Content/Header"]
+custom_minimum_size = Vector2(72, 72)
 layout_mode = 2
-text = "Level"
+script = ExtResource("7_toy_button")
+picture = "house"
+color = Color(1, 0.705882, 0.635294, 1)
 
-[node name="LevelValue" type="Label" parent="Content/Header"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
-text = "1"
-
-[node name="Gap" type="Control" parent="Content/Header"]
-custom_minimum_size = Vector2(14, 0)
-layout_mode = 2
-
-[node name="ScoreCaption" type="Label" parent="Content/Header"]
-layout_mode = 2
-text = "Cleared"
-
-[node name="ScoreValue" type="Label" parent="Content/Header"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
-text = "0"
-
-[node name="Spacer" type="Control" parent="Content/Header"]
+[node name="Pips" type="Control" parent="Content/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
+mouse_filter = 2
+script = ExtResource("8_pips")
+
+[node name="ScoreStar" type="Control" parent="Content/Header"]
+custom_minimum_size = Vector2(60, 72)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("9_star")
+
+[node name="ScoreValue" type="Label" parent="Content/Header"]
+custom_minimum_size = Vector2(56, 0)
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(1, 1, 1, 1)
+theme_override_constants/outline_size = 10
+theme_override_font_sizes/font_size = 44
+text = "0"
+vertical_alignment = 1
 
 [node name="TimerBar" type="Control" parent="Content"]
-custom_minimum_size = Vector2(0, 8)
+custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
 script = ExtResource("2_timer")
-
-[node name="TimerText" type="Label" parent="Content"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "30s"
 
 [node name="Board" type="Panel" parent="Content"]
 custom_minimum_size = Vector2(640, 640)
@@ -108,34 +130,32 @@ layout_mode = 1
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBox_tray")
 
-[node name="Toast" type="PanelContainer" parent="Content/Board"]
-modulate = Color(1, 1, 1, 0)
-z_index = 10
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBox_toast")
-
-[node name="Label" type="Label" parent="Content/Board/Toast"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.913725, 0.92549, 0.94902, 1)
-theme_override_font_sizes/font_size = 22
-text = "Level cleared!"
-
-
 [node name="UhUh" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("4_uh_uh")
 
 [node name="Chime" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("5_chime")
 
+[node name="Pop" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("11_pop")
+
+[node name="Boing" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("12_boing")
+volume_db = -6.0
+
+[node name="Whoosh" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("13_whoosh")
+
+[node name="Fanfare" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("14_fanfare")
+
+[node name="Finale" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("15_finale")
+
 [node name="Dots" type="CanvasLayer" parent="." node_paths=PackedStringArray("area", "mask")]
 script = ExtResource("6_dots")
 area = NodePath("../Content/Board")
 mask = NodePath("../Content/Board/Tray")
+
+[node name="Effects" type="CanvasLayer" parent="."]
+script = ExtResource("10_effects")

@@ -7,17 +7,22 @@ const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tr
 const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 
 @onready var content: VBoxContainer = $Content
-@onready var level_label: Label = $Content/Header/LevelValue
+@onready var home: ToyButton = $Content/Header/Home
+@onready var pips: ProgressPips = $Content/Header/Pips
+@onready var score_star: StarBadge = $Content/Header/ScoreStar
 @onready var score_label: Label = $Content/Header/ScoreValue
 @onready var timer_bar: TimerBar = $Content/TimerBar
-@onready var timer_text: Label = $Content/TimerText
 @onready var board: Panel = $Content/Board
 @onready var tray: Panel = $Content/Board/Tray
-@onready var toast: PanelContainer = $Content/Board/Toast
-@onready var toast_label: Label = $Content/Board/Toast/Label
 @onready var uh_uh: AudioStreamPlayer = $UhUh
 @onready var chime: AudioStreamPlayer = $Chime
+@onready var pop: AudioStreamPlayer = $Pop
+@onready var boing: AudioStreamPlayer = $Boing
+@onready var whoosh: AudioStreamPlayer = $Whoosh
+@onready var fanfare: AudioStreamPlayer = $Fanfare
+@onready var finale: AudioStreamPlayer = $Finale
 @onready var dots: Dots = $Dots
+@onready var effects: Effects = $Effects
 
 var levels: Array[Dictionary] = []  # see LevelConfig
 var hole_count := 0
@@ -33,7 +38,6 @@ var deadline_ms := 0
 var transitioning := false
 var board_size := Vector2.ZERO  # the board's laid-out size, known before containers sort
 var _level_id := 0  # lets a pending level change notice it was superseded
-var _toast_tween: Tween
 var _chime_step := 0  # rises with each placement, resets each level
 
 
@@ -41,16 +45,18 @@ func _ready() -> void:
 	levels = LevelConfig.load_levels()
 	ShapeView.load_size()
 	dots.colors_changed.connect(_recolor_pieces)
+	home.activated.connect(_go_home)
 	resized.connect(_layout)
 	_layout()
 	new_level()
 
 
 func _layout() -> void:
-	# 95 px of header and timer above the board, 16 px margin below.
-	board_size = Vector2(maxf(size.x - 32, 200), maxf(size.y - 111, 200))
+	# 16 px top margin, 72 px header, 18 px timer and 12 px gaps above the board,
+	# 24 px margins at the sides and below, which leaves room for its frame.
+	board_size = Vector2(maxf(size.x - 48, 200), maxf(size.y - 154, 200))
 	board.custom_minimum_size = board_size
-	content.position = Vector2(16, 12)
+	content.position = Vector2(24, 16)
 	content.size = Vector2(board_size.x, 0)
 
 
@@ -149,12 +155,14 @@ func new_level() -> void:
 		return
 	_chime_step = 0
 	level_num += 1
-	level_label.text = str(level_num)
+	effects.clear_star()
 	hole_count = config.holes
 	pieces_per_shape = config.shapes
 	level_time = config.duration
 	dots.visible = config.filter
 	dots.process_mode = Node.PROCESS_MODE_INHERIT if config.filter else Node.PROCESS_MODE_DISABLED
+	timer_bar.modulate.a = 1.0 if level_time > 0 else 0.0  # hidden, but keeps its place in the layout
+	pips.total = hole_count * pieces_per_shape
 
 	var shapes := Shapes.pick(hole_count)
 	var side := ShapeView.side_for(board_size)
@@ -206,20 +214,35 @@ func _clear_board() -> void:
 	drag = {}
 
 
-## Leaves the board empty with the toast showing; no further levels start.
+## Leaves the board empty under a big star and confetti; no further levels
+## start. The home button pulses to show the way back.
 func end_game() -> void:
 	transitioning = true
-	toast_label.text = "Game over"
-	if _toast_tween:
-		_toast_tween.kill()
-	_toast_tween = create_tween()
-	_toast_tween.tween_property(toast, "modulate:a", 1.0, 0.2)
+	var rect := board.get_global_rect()
+	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.5, 0.0, true)
+	effects.confetti(rect, 120)
+	finale.play()
+	home.start_pulse()
 
 
-func end_level(message: String, delay: float) -> void:
+## Cleared levels get a cheering star, confetti and a fanfare. When time runs
+## out there is no failure message: the pieces just float away with a whoosh.
+func end_level(cleared: bool) -> void:
 	transitioning = true
 	deselect()
-	show_toast(message, delay)
+	var delay := 1.2
+	if cleared:
+		delay = 1.8
+		var rect := board.get_global_rect()
+		effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 1.1)
+		effects.confetti(rect)
+		fanfare.play()
+	else:
+		whoosh.play()
+		for p in pieces:
+			var t := p.create_tween().set_parallel().set_trans(Tween.TRANS_SINE)
+			t.tween_property(p, "modulate:a", 0.0, 0.5)
+			t.tween_property(p, "visual_scale", 0.4, 0.5)
 	var id := _level_id
 	get_tree().create_timer(delay).timeout.connect(func():
 		if id == _level_id:
@@ -227,28 +250,22 @@ func end_level(message: String, delay: float) -> void:
 	)
 
 
-func show_toast(message: String, duration: float) -> void:
-	toast_label.text = message
-	if _toast_tween:
-		_toast_tween.kill()
-	_toast_tween = create_tween()
-	_toast_tween.tween_property(toast, "modulate:a", 1.0, 0.2)
-	_toast_tween.tween_interval(maxf(0, duration - 0.3))
-	_toast_tween.tween_property(toast, "modulate:a", 0.0, 0.2)
+func _go_home() -> void:
+	# A moment for the button's squish and pop before the scene goes.
+	await get_tree().create_timer(0.15).timeout
+	get_tree().change_scene_to_file("res://menu.tscn")
 
 
 func _process(_delta: float) -> void:
 	if level_time <= 0:
 		timer_bar.ratio = 1.0
 		timer_bar.low = false
-		timer_text.text = "No time limit"
 		return
 	var remaining := maxi(0, deadline_ms - Time.get_ticks_msec())
 	timer_bar.ratio = remaining / (level_time * 1000)
 	timer_bar.low = remaining < 5000
-	timer_text.text = "%ds" % ceili(remaining / 1000.0)
 	if remaining == 0 and not transitioning:
-		end_level("Time's up!", 1.2)
+		end_level(false)
 
 
 # ---------- Matching ----------
@@ -261,11 +278,21 @@ func place(p: ShapeView) -> void:
 	p.z_index = 1
 	p.vanish_into(p.target_hole.norm_pos)
 	play_chime()
+	pips.add_one()
+	# The hole gulps the piece down with a sparkle as it arrives.
+	var hole := p.target_hole
+	get_tree().create_timer(0.2).timeout.connect(func():
+		if is_instance_valid(hole):
+			hole.squish(0.25)
+			var rect := hole.get_global_rect()
+			effects.burst(rect.get_center(), rect.size.x * 0.5)
+	)
 	pieces.erase(p)
 	if pieces.is_empty():
 		score += 1
 		score_label.text = str(score)
-		end_level("Level cleared!", 0.9)
+		score_star.bounce()
+		end_level(true)
 
 
 func play_chime() -> void:
@@ -280,6 +307,7 @@ func reject(p: ShapeView, _hole: ShapeView) -> void:
 	p.nod()
 	p.target_hole.bulge()
 	uh_uh.play()
+	boing.play()  # the soft spring back home
 	p.move_to(p.home)
 
 
@@ -323,7 +351,17 @@ func _on_hole_input(event: InputEvent, hole: ShapeView) -> void:
 	var clicked: bool = event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed
 	if clicked or event.is_action_pressed("ui_accept"):
 		hole.accept_event()
+		if not selected and not transitioning:
+			_press_feedback(hole)  # a placement or rejection brings its own feedback
 		tap_hole(hole)
+
+
+## Squish and pop the moment something is pressed, before the press resolves
+## into a tap or a drag, so it never seems unresponsive.
+func _press_feedback(view: ShapeView) -> void:
+	view.squish()
+	pop.pitch_scale = randf_range(0.9, 1.15)
+	pop.play()
 
 
 # ---------- Drag and drop ----------
@@ -331,11 +369,14 @@ func _on_hole_input(event: InputEvent, hole: ShapeView) -> void:
 func _on_piece_input(event: InputEvent, p: ShapeView) -> void:
 	if event.is_action_pressed("ui_accept"):
 		p.accept_event()
+		if not (p.placed or transitioning):
+			_press_feedback(p)
 		tap_piece(p)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		p.accept_event()
 		if event.pressed:
 			if not (p.placed or transitioning or drag):
+				_press_feedback(p)
 				drag = {"p": p, "start": event.global_position, "origin": p.norm_pos, "moved": false}
 		elif drag and drag.p == p:
 			_end_drag()

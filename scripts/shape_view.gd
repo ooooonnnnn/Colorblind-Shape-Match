@@ -51,6 +51,14 @@ var tilt := 0.0:  # radians
 	set(v):
 		tilt = v
 		queue_redraw()
+var squash := 0.0:  # > 0 is wide and flat, < 0 tall and thin
+	set(v):
+		squash = v
+		queue_redraw()
+var breath := 1.0:  # holes only: slow idle swell, on top of visual_scale
+	set(v):
+		breath = v
+		queue_redraw()
 
 var _points := PackedVector2Array()  # centered on (0, 0)
 var _show_focus := false
@@ -58,6 +66,7 @@ var _move_tween: Tween
 var _scale_tween: Tween
 var _shake_tween: Tween
 var _tilt_tween: Tween
+var _squash_tween: Tween
 
 
 func setup(shape: Dictionary, piece: bool) -> void:
@@ -78,6 +87,17 @@ func _ready() -> void:
 	focus_exited.connect(queue_redraw)
 	get_parent().resized.connect(_update_layout)
 	_update_layout()
+	if not is_piece:
+		_breathe()
+
+
+## Holes swell and settle slowly, out of step with each other, to show they
+## are there to be filled.
+func _breathe() -> void:
+	var t := create_tween().set_loops().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	t.tween_interval(randf_range(0.0, 1.2))
+	t.tween_property(self, "breath", 1.05, 1.2)
+	t.tween_property(self, "breath", 1.0, 1.2)
 
 
 ## Reads side_fraction from CONFIG_PATH.
@@ -166,6 +186,18 @@ func bulge() -> void:
 		_scale_tween.tween_property(self, "visual_scale", 1.0, 0.18).set_ease(Tween.EASE_IN)
 
 
+## Squish flat, then spring tall past the rest shape before settling, like a
+## soft toy being pressed. amount is the first, flattest squash.
+func squish(amount := 0.18) -> void:
+	if _squash_tween:
+		_squash_tween.kill()
+	_squash_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_squash_tween.tween_property(self, "squash", amount, 0.06)
+	_squash_tween.tween_property(self, "squash", -amount * 0.6, 0.1)
+	_squash_tween.tween_property(self, "squash", amount * 0.25, 0.1)
+	_squash_tween.tween_property(self, "squash", 0.0, 0.12)
+
+
 func _on_focus_entered() -> void:
 	# Only show the focus ring for keyboard focus, like CSS :focus-visible.
 	_show_focus = not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
@@ -176,7 +208,7 @@ func _draw() -> void:
 	if _points.is_empty():
 		return
 	var k := size.x / 100.0
-	draw_set_transform(size / 2 + Vector2(shake_offset, 0), tilt, Vector2.ONE * k * visual_scale)
+	draw_set_transform(size / 2 + Vector2(shake_offset, 0), tilt, Vector2(1 + squash, 1 - squash) * k * visual_scale * breath)
 	var outline := _points.duplicate()
 	outline.append(_points[0])
 
