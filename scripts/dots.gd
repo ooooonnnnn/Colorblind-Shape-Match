@@ -87,7 +87,7 @@ func _ready() -> void:
 
 
 func _load_config() -> void:
-	var data = JSON.parse_string(FileAccess.get_file_as_string(CONFIG_PATH))
+	var data = JSON.parse_string(FileAccess.get_file_as_string(SettingsFile.read_path(CONFIG_PATH)))
 	if not data is Dictionary:
 		push_error("Bad or missing dot config in %s" % CONFIG_PATH)
 		data = {}
@@ -116,7 +116,7 @@ func _show_board_color() -> void:
 
 
 func save_config() -> Error:
-	var file := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(SettingsFile.write_path(CONFIG_PATH), FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
 	var data := {"max_radius": max_radius, "gap": gap, "fill_percent": snappedf(fill * 100, 0.01)}
@@ -129,7 +129,7 @@ func save_config() -> Error:
 
 
 func _load_noise() -> void:
-	var data = JSON.parse_string(FileAccess.get_file_as_string(NOISE_PATH))
+	var data = JSON.parse_string(FileAccess.get_file_as_string(SettingsFile.read_path(NOISE_PATH)))
 	if not data is Dictionary:
 		push_error("Bad or missing noise config in %s" % NOISE_PATH)
 		data = {}
@@ -162,7 +162,7 @@ func apply_noise(data: Dictionary) -> void:
 
 
 func save_noise() -> Error:
-	var file := FileAccess.open(NOISE_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(SettingsFile.write_path(NOISE_PATH), FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
 	var data := {}

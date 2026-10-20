@@ -106,7 +106,7 @@ func _breathe() -> void:
 
 ## Reads side_fraction and outline_percent from CONFIG_PATH.
 static func load_size() -> void:
-	var data = JSON.parse_string(FileAccess.get_file_as_string(CONFIG_PATH))
+	var data = JSON.parse_string(FileAccess.get_file_as_string(SettingsFile.read_path(CONFIG_PATH)))
 	if not data is Dictionary:
 		push_error("Bad or missing shape size in %s" % CONFIG_PATH)
 		return
@@ -115,7 +115,7 @@ static func load_size() -> void:
 
 
 static func save_size() -> Error:
-	var file := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(SettingsFile.write_path(CONFIG_PATH), FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
 	var data := {"size_percent": snappedf(side_fraction * 100, 0.01), "outline_percent": snappedf(outline_percent, 0.01)}

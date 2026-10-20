@@ -58,7 +58,8 @@ static func article_copy() -> Array:
 
 ## {custom: bool, groups: the player's own groups, each like an ARTICLE entry}.
 static func load_settings() -> Dictionary:
-	var data = JSON.parse_string(FileAccess.get_file_as_string(PATH)) if FileAccess.file_exists(PATH) else {}
+	var path := SettingsFile.read_path(PATH)
+	var data = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else {}
 	if not data is Dictionary:
 		push_error("Bad color group config in %s" % PATH)
 		data = {}
@@ -96,7 +97,7 @@ static func save_settings(settings: Dictionary) -> Error:
 			"colors": group.colors.map(func(c): return "#" + c.to_html(false)),
 		})
 	var data := {"mode": "custom" if settings.custom else "article", "custom_groups": groups}
-	var file := FileAccess.open(PATH, FileAccess.WRITE)
+	var file := FileAccess.open(SettingsFile.write_path(PATH), FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
 	file.store_string(JSON.stringify(data, "\t", false) + "\n")

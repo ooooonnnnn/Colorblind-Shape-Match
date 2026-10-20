@@ -9,7 +9,7 @@ const PATH := "res://config.json"
 
 
 static func load_levels() -> Array[Dictionary]:
-	var data = JSON.parse_string(FileAccess.get_file_as_string(PATH))
+	var data = JSON.parse_string(FileAccess.get_file_as_string(SettingsFile.read_path(PATH)))
 	if not (data is Dictionary and data.get("levels") is Array and not data.levels.is_empty()):
 		push_error("Bad or missing level list in %s" % PATH)
 		data = {"levels": [{}]}
@@ -34,7 +34,7 @@ static func save_levels(levels: Array[Dictionary]) -> Error:
 		lines.append('\t\t{ "duration": %s, "holes": %d, "shapes": %d, "repetitions": %d, "filter": %s, "colors": %s }' % [
 				str(int(duration)) if duration == int(duration) else str(duration),
 				e.holes, e.shapes, e.repetitions, JSON.stringify(e.filter), JSON.stringify(e.colors)])
-	var file := FileAccess.open(PATH, FileAccess.WRITE)
+	var file := FileAccess.open(SettingsFile.write_path(PATH), FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
 	file.store_string('{\n\t"levels": [\n%s\n\t]\n}\n' % ",\n".join(lines))
