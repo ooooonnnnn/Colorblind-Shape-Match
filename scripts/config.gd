@@ -283,8 +283,8 @@ func _add_row(entry: Dictionary) -> void:
 	controls.add_child(_stack([row.forever, row.repetitions]))
 	controls.add_child(_stack([row.filter]))
 	controls.add_child(_stack([colors_label, row.colors]))
-	row.extra.tooltip_text = "Extra pieces on the board, in colors the group's type of color blindness can see. The level still clears after as many placements as it has pieces."
-	row.extra_scored.tooltip_text = "On: placing an extra shape counts toward clearing the level. Off: only the group's own pieces count."
+	row.extra.tooltip_text = "Extra pieces on the board, in colors the group's type of color blindness can see."
+	row.extra_scored.tooltip_text = "On: extra shapes are part of the total, so every piece must be placed to clear the level. Off: only the group's own pieces count, and extras are optional."
 	controls.add_child(_stack([row.extra, row.extra_scored]))
 	for stepper in [row.holes, row.shapes, row.duration, row.repetitions, row.extra]:
 		stepper.changed.connect(func(_v): _refresh_rows())
@@ -374,7 +374,8 @@ func _refresh_rows() -> void:
 				row.colors.get_item_text(row.colors.selected).to_lower() if row.colors.get_meta("choice") == ColorGroups.RANDOM
 						else "%s colors" % row.colors.get_item_text(row.colors.selected).get_slice(" (", 0),
 				"" if extra == 0 else "\n+ %d extra %s on the board, %s; %d to place to clear" % [extra, "shape" if extra == 1 else "shapes",
-						"counted in the score" if row.extra_scored.button_pressed else "not counted", holes * pieces]]
+						"counted in the score" if row.extra_scored.button_pressed else "not counted",
+						holes * pieces + (extra if row.extra_scored.button_pressed else 0)]]
 		var reached := endless_at < 0
 		row.card.modulate.a = 1.0 if reached else 0.5
 		row.unreached.visible = not reached

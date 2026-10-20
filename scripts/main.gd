@@ -203,8 +203,8 @@ func new_level() -> void:
 	effects.clear_star()
 	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups, config.colors))
 	# Extra shapes join the level's own pieces on the board, in colors its
-	# group's type sees as well as anyone (see ExtraShapes), but the level still
-	# clears after as many placements as it has own pieces.
+	# group's type sees as well as anyone (see ExtraShapes). When they count,
+	# every piece must be placed; when not, only the level's own pieces.
 	var own: int = config.holes * config.shapes
 	var extra_colors: Array[Color] = []
 	if config.extra > 0:
@@ -212,7 +212,7 @@ func new_level() -> void:
 	var extra_count: int = config.extra if not extra_colors.is_empty() else 0
 	var total := own + extra_count
 	extra_scored = config.extra_scored
-	_left_to_clear = own
+	_left_to_clear = total if extra_scored else own
 	dots.show_group(group, PackedColorArray(extra_colors))
 	_level_group = group.id if config.filter else Stats.BASELINE
 	hole_count = config.holes
@@ -222,7 +222,7 @@ func new_level() -> void:
 	dots.visible = config.filter
 	dots.process_mode = Node.PROCESS_MODE_INHERIT if config.filter else Node.PROCESS_MODE_DISABLED
 	timer_bar.modulate.a = 1.0 if level_time > 0 else 0.0  # hidden, but keeps its place in the layout
-	pips.total = own
+	pips.total = _left_to_clear
 
 	var shapes := Shapes.pick(hole_count)
 	var side := ShapeView.side_for(board_size)
