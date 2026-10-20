@@ -1,16 +1,18 @@
 extends Control
 ## Edits the level sequences (LevelConfig), the dot filter (dots.json), the dot
 ## color noise (noise.json), the color groups (ColorGroups) and the shape size
-## (shape_size.json), one tab each. The preview shows all but the levels live,
-## with the color group last chosen or edited; nothing is written until Save.
+## (shape_size.json) and color blind mode (ColorVision), one tab each. The
+## preview shows all but the levels live, with the color group last chosen or
+## edited, and color blind mode shows on the whole page; nothing is written
+## until Save.
 
 const Dots := preload("res://scripts/dots.gd")
 const ColorGroups := preload("res://scripts/color_groups.gd")
 const GroupPlate := preload("res://scripts/group_plate.gd")
 const PREVIEW_SHAPES := ["circle", "star", "square"]  # the CVTME shapes
 const PREVIEW_COPIES := 2  # pieces per preview shape, to show copies taking different colors
-const LIGHTNESS_OK := Color("4caf7a")
-const LIGHTNESS_OFF := Color("e8a33d")
+const MATCH_OK := Color("4caf7a")
+const MATCH_OFF := Color("e8a33d")
 const PREVIEW_SPACING := 16.0  # px between neighbouring preview shapes
 const TRAY_PADDING := 24.0     # px between the holes and the tray edge, as in the game
 const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1, "filter": true, "colors": "random"}
@@ -25,6 +27,7 @@ const PART_NAMES := {"background": "Background dots", "shapes": "Shape dots"}
 @onready var dots_page: VBoxContainer = %DotsPage
 @onready var colors_page: VBoxContainer = %ColorsPage
 @onready var shapes_page: VBoxContainer = %ShapesPage
+@onready var vision_page: VBoxContainer = %VisionPage
 @onready var back: ToyButton = %Back
 @onready var save: Button = %Save
 @onready var saved_note: Label = %SavedNote
@@ -40,7 +43,7 @@ var _size_slider: HSlider
 var _outline_slider: HSlider
 var _board_color := ColorPickerButton.new()
 var _groups := {}  # see ColorGroups.load_settings
-var _cards := {}  # {group id: {group, plate, bars: lightness bar per figure color}}
+var _cards := {}  # {group id: {group, plate, bars: match bar per figure color}}
 var _mode_buttons: Array[Button] = []  # article, custom
 var _groups_note := Label.new()
 var _restore_groups := Button.new()
@@ -49,6 +52,9 @@ var _preview_colors := {}  # {key: group id and palette size, indices: figure co
 var _previewed := ""  # the color group shown in the preview
 var _holes: Array[ShapeView] = []
 var _pieces: Array[ShapeView] = []
+var _vision_buttons := {}  # {ColorVision mode: Button}
+var _vision_about := Label.new()
+var _severity_slider: HSlider
 var _saved_tween: Tween
 
 
@@ -64,7 +70,9 @@ func _ready() -> void:
 	_build_shapes_page()
 	preview.resized.connect(_layout_preview)
 	_build_colors_page()
+	_build_vision_page()
 	back.activated.connect(func():
+		ColorVision.load_settings()  # leave unsaved changes behind
 		await get_tree().create_timer(0.15).timeout  # let the button's pop play
 		get_tree().change_scene_to_file("res://menu.tscn")
 	)
@@ -510,8 +518,8 @@ func _rebuild_groups() -> void:
 
 
 ## One group: a mini plate in its colors, what it tests, and its swatches, each
-## piece color over a bar showing whether it matches the background's
-## lightness. Editable only with "My own colors".
+## piece color over a bar showing whether it blends into the background for
+## the group's type of color blindness. Editable only with "My own colors".
 func _add_card(group: Dictionary, group_count: int) -> void:
 	var editable: bool = _groups.custom
 	var card := PanelContainer.new()
@@ -583,7 +591,8 @@ func _add_card(group: Dictionary, group_count: int) -> void:
 
 
 ## A color picker for group's background (i = -1) or its piece color i, over
-## a bar that shows whether a piece color matches the background's lightness.
+## a bar that shows whether a piece color blends into the background for the
+## group's type of color blindness.
 func _swatch(group: Dictionary, i: int, editable: bool, swatch_size: Vector2) -> Dictionary:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
@@ -611,20 +620,19 @@ func _on_group_color_changed(color: Color, group: Dictionary, i: int) -> void:
 	_preview_group(group.id)
 
 
-## Refreshes each card's plate and lightness bars.
+## Refreshes each card's plate and match bars.
 func _update_cards() -> void:
 	for id in _cards:
 		var card: Dictionary = _cards[id]
 		var group: Dictionary = card.group
 		card.plate.background = group.background
 		card.plate.colors = group.colors
-		var background_l := ColorGroups.lightness(group.background)
 		for i in card.bars.size():
-			var l := ColorGroups.lightness(group.colors[i])
-			var matches := absf(l - background_l) <= ColorGroups.LIGHTNESS_TOLERANCE
-			card.bars[i].color = LIGHTNESS_OK if matches else LIGHTNESS_OFF
-			card.bars[i].tooltip_text = "Lightness %d, background %d: %s" % [roundi(l), roundi(background_l),
-					"matches, so it can only be told apart by color" if matches else "color-blind players may spot it by brightness"]
+			var difference := ColorGroups.seen_difference(group.id, group.colors[i], group.background)
+			var matches := difference <= ColorGroups.MATCH_TOLERANCE
+			card.bars[i].color = MATCH_OK if matches else MATCH_OFF
+			card.bars[i].tooltip_text = "%s players see it %d apart from the background: %s" % [group.name, roundi(difference),
+					"it blends in, on their confusion line" if matches else "off their confusion line, so they may spot it"]
 
 
 ## Shows group id in the preview: its background, and two copies of each
@@ -656,6 +664,47 @@ func _preview_group(id: String) -> void:
 	_layout_preview()
 
 
+# ---------- Color blind mode ----------
+
+func _build_vision_page() -> void:
+	tabs.set_tab_title(vision_page.get_parent().get_index(), "Color blind")
+	var card := _card(vision_page, "Color blind mode",
+			"See the whole game as someone with a type of color blindness does, to check whether a color group really hides its shapes. It shows on every screen, this one included, until it is turned back to normal vision.")
+	var choices := HBoxContainer.new()
+	choices.add_theme_constant_override("separation", 10)
+	var group := ButtonGroup.new()
+	var names := {ColorVision.NONE: "Normal vision"}
+	for type in ColorVision.TYPES:
+		names[type] = ColorVision.TYPES[type].name
+	for mode in names:
+		var b := Button.new()
+		b.text = names[mode]
+		b.toggle_mode = true
+		b.button_group = group
+		b.button_pressed = mode == ColorVision.mode
+		b.pressed.connect(_on_vision_selected.bind(mode))
+		choices.add_child(b)
+		_vision_buttons[mode] = b
+	card.add_child(choices)
+	_vision_about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_vision_about.add_theme_font_size_override("font_size", 16)
+	_vision_about.add_theme_color_override("font_color", MUTED)
+	card.add_child(_vision_about)
+
+	var strength := _card(vision_page, "Strength",
+			"Many color blind people still have weakened cones of the missing type, so they see some of the difference. 100% is the full form, with none at all.")
+	_severity_slider = _slider(strength, "Strength", 10, 100, 5, ColorVision.severity * 100,
+			func(v): return "%d%%" % v, func(): ColorVision.severity = _severity_slider.value / 100)
+	_on_vision_selected(ColorVision.mode)
+
+
+func _on_vision_selected(mode: String) -> void:
+	ColorVision.mode = mode
+	var on := mode != ColorVision.NONE
+	_vision_about.text = ColorVision.TYPES[mode].about if on else "Colors show as they are."
+	_severity_slider.editable = on
+
+
 # ---------- Preview ----------
 
 ## Holes in a row inside the tray, with their pieces in a row below.
@@ -683,7 +732,7 @@ func _layout_preview() -> void:
 
 func _save() -> void:
 	var failed := false
-	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size()]:
+	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size(), ColorVision.save_settings()]:
 		if result != OK:
 			failed = true
 			push_error("Could not save config: %s" % error_string(result))

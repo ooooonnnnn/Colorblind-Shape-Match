@@ -45,9 +45,9 @@ const NOISE_CHANNELS := ["hue", "saturation", "value"]
 		board_color = v
 		if is_node_ready():
 			_show_board_color()
-@export var background_color := Color("7c9449")
+@export var background_color := Color("559c68")
 ## The colors pieces are filled with, at most ColorGroups.MAX_COLORS.
-@export var figure_colors := PackedColorArray([Color("e0655e"), Color("d76d49"), Color("c47a3e"), Color("bc72b3"), Color("d1689b")])
+@export var figure_colors := PackedColorArray([Color("b59267"), Color("c98e67"), Color("db8b67"), Color("eb8767"), Color("fa8366")])
 
 var max_radius: float = DEFAULT_CONFIG.max_radius  # px
 var gap: float = DEFAULT_CONFIG.gap                # px between neighbouring circles
