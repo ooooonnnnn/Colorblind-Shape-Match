@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bmbq2aox6ovdd"]
 
-[ext_resource type="Theme" path="res://ui_theme.tres" id="0_theme"]
+[ext_resource type="Theme" uid="uid://b426jgoyfty6l" path="res://ui_theme.tres" id="0_theme"]
 [ext_resource type="Script" uid="uid://fsp2vy8ki40l" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://bv2qu221uye1x" path="res://scripts/timer_bar.gd" id="2_timer"]
 [ext_resource type="AudioStream" uid="uid://d31jia44rl45k" path="res://sounds/uh_uh.mp3" id="4_uh_uh"]
@@ -12,7 +12,6 @@
 [ext_resource type="Script" uid="uid://00jnqgabn85w" path="res://scripts/effects.gd" id="10_effects"]
 [ext_resource type="AudioStream" uid="uid://clkiv064ygbq2" path="res://sounds/pop.wav" id="11_pop"]
 [ext_resource type="AudioStream" uid="uid://hvlt77h46w57" path="res://sounds/boing.wav" id="12_boing"]
-[ext_resource type="AudioStream" uid="uid://ble1ae5n0l0lf" path="res://sounds/whoosh.wav" id="13_whoosh"]
 [ext_resource type="AudioStream" uid="uid://dy6sbvw6dviht" path="res://sounds/fanfare.wav" id="14_fanfare"]
 [ext_resource type="AudioStream" uid="uid://da7yqtfs4kiax" path="res://sounds/finale.wav" id="15_finale"]
 
@@ -137,7 +136,6 @@ stream = ExtResource("12_boing")
 volume_db = -6.0
 
 [node name="Whoosh" type="AudioStreamPlayer" parent="." unique_id=1636754945]
-stream = ExtResource("13_whoosh")
 
 [node name="Fanfare" type="AudioStreamPlayer" parent="." unique_id=1388197001]
 stream = ExtResource("14_fanfare")
