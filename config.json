@@ -1,7 +1,7 @@
 {
 	"levels": [
-		{ "duration": 0, "holes": 1, "shapes": 1, "repetitions": 2, "filter": false, "colors": "random" },
-		{ "duration": 0, "holes": 2, "shapes": 1, "repetitions": 2, "filter": true, "colors": "random" },
-		{ "duration": 10, "holes": 3, "shapes": 2, "repetitions": 0, "filter": true, "colors": "random" }
+		{ "duration": 0, "holes": 1, "shapes": 1, "repetitions": 2, "filter": false, "colors": "random", "time_bonus": true },
+		{ "duration": 0, "holes": 2, "shapes": 1, "repetitions": 2, "filter": true, "colors": "random", "time_bonus": true },
+		{ "duration": 10, "holes": 3, "shapes": 2, "repetitions": 0, "filter": true, "colors": "random", "time_bonus": false }
 	]
 }

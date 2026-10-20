@@ -201,6 +201,13 @@ func _base_colors() -> PackedColorArray:
 
 
 func _process(_delta: float) -> void:
+	refresh()
+
+
+## Brings the circles up to date with the colors and the area and mask rects
+## right away. Call it after changing those, so the frame that shows the
+## change never shows the old circles, which could leave a piece uncovered.
+func refresh() -> void:
 	if _base_colors() != _shown_colors:
 		_shown_colors = _base_colors()
 		_circles.material.set_shader_parameter("bases", _shown_colors)

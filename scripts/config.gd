@@ -15,7 +15,7 @@ const MATCH_OK := Color("4caf7a")
 const MATCH_OFF := Color("e8a33d")
 const PREVIEW_SPACING := 16.0  # px between neighbouring preview shapes
 const TRAY_PADDING := 24.0     # px between the holes and the tray edge, as in the game
-const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1, "filter": true, "colors": "random"}
+const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1, "filter": true, "colors": "random", "time_bonus": true}
 const BADGE := Color("ffd166")
 const REMOVE := Color("ffb4a2")
 const MUTED := Color(0.231373, 0.184314, 0.290196, 0.7)  # Icons.INK, for explanations
@@ -205,6 +205,7 @@ func _add_row(entry: Dictionary) -> void:
 		"shapes": Stepper.new("Pieces per hole", 1, 20, entry.shapes),
 		"time_on": _switch("Time limit", entry.duration > 0),
 		"duration": Stepper.new("Seconds", 5, 600, entry.duration if entry.duration > 0 else 30.0, 5),
+		"time_bonus": _switch("Time bonus and penalty", entry.time_bonus),
 		"forever": _switch("Plays forever", entry.repetitions <= 0),
 		"repetitions": Stepper.new("Times to play", 1, 99, entry.repetitions if entry.repetitions > 0 else 1),
 		"filter": _switch("Dots filter", entry.filter),
@@ -222,13 +223,15 @@ func _add_row(entry: Dictionary) -> void:
 	colors_label.text = "Colors"
 	controls.add_child(row.holes)
 	controls.add_child(row.shapes)
-	controls.add_child(_stack([row.time_on, row.duration]))
+	row.time_bonus.tooltip_text = "+%d s for each match, −%d s for each tap that misses every piece and hole" % [
+			LevelConfig.TIME_BONUS, LevelConfig.TIME_PENALTY]
+	controls.add_child(_stack([row.time_on, row.duration, row.time_bonus]))
 	controls.add_child(_stack([row.forever, row.repetitions]))
 	controls.add_child(_stack([row.filter]))
 	controls.add_child(_stack([colors_label, row.colors]))
 	for stepper in [row.holes, row.shapes, row.duration, row.repetitions]:
 		stepper.changed.connect(func(_v): _refresh_rows())
-	for switch in [row.time_on, row.forever, row.filter]:
+	for switch in [row.time_on, row.time_bonus, row.forever, row.filter]:
 		switch.toggled.connect(func(_on): _refresh_rows())
 
 	var remove := ToyButton.new()
@@ -300,11 +303,13 @@ func _refresh_rows() -> void:
 		row.picture.pieces = pieces
 		row.picture.filter = row.filter.button_pressed
 		row.duration.editable = row.time_on.button_pressed
+		row.time_bonus.disabled = not row.time_on.button_pressed
 		row.repetitions.editable = not row.forever.button_pressed
 		row.remove.disabled = _rows.size() == 1
 		row.summary.text = "%d %s, %d %s for each.\n%s · %s · %s · %s" % [
 				holes, "hole" if holes == 1 else "holes", pieces, "piece" if pieces == 1 else "pieces",
-				"%d seconds per level" % row.duration.value if row.time_on.button_pressed else "No time limit",
+				("%d seconds per level" % row.duration.value + (", +%d s a match, −%d s a stray tap" % [LevelConfig.TIME_BONUS, LevelConfig.TIME_PENALTY]
+						if row.time_bonus.button_pressed else "")) if row.time_on.button_pressed else "No time limit",
 				"plays forever" if row.forever.button_pressed else ("plays once" if row.repetitions.value == 1 else "plays %d times" % row.repetitions.value),
 				"dots on" if row.filter.button_pressed else "no dots",
 				row.colors.get_item_text(row.colors.selected).to_lower() if row.colors.get_meta("choice") == ColorGroups.RANDOM
@@ -327,6 +332,7 @@ func _levels() -> Array[Dictionary]:
 			"repetitions": 0 if row.forever.button_pressed else int(row.repetitions.value),
 			"filter": row.filter.button_pressed,
 			"colors": row.colors.get_meta("choice"),
+			"time_bonus": row.time_bonus.button_pressed,
 		})
 	return levels
 
