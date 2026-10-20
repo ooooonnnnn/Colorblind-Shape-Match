@@ -8,6 +8,7 @@ const CONFIG_PATH := "res://shape_size.json"
 const PIECE_FILL := Color("f1ede2")
 const HOLE_FILL := Color("0e1118")
 const ACCENT := Color.WHITE
+const TOUCH_SLOP := 0.12  # how far past its outline a tap still lands, as a fraction of the side
 
 static var side_fraction := 0.2  # width as a fraction of the board's shorter side
 ## Width of a piece's outline, as a percentage of its side. Pieces are drawn
@@ -124,6 +125,12 @@ static func save_size() -> Error:
 			data[key] = int(data[key])  # keep whole numbers free of a trailing .0
 	file.store_string(JSON.stringify(data, "\t", false) + "\n")
 	return OK
+
+
+## Taps land anywhere in the bounding circle, outline included, and a little
+## past it, so a slightly-off tap still counts, even outside the square box.
+func _has_point(point: Vector2) -> bool:
+	return point.distance_to(size / 2) <= size.x * (radius + outline_percent / 200 + TOUCH_SLOP)
 
 
 ## Side length in pixels of a piece or hole on a board of this size.

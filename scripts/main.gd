@@ -4,7 +4,7 @@ const Dots := preload("res://scripts/dots.gd")
 const ColorGroups := preload("res://scripts/color_groups.gd")
 const Stats := preload("res://scripts/stats.gd")
 const MIN_LOOK_MS := 10000   # how long a level must have been up before leaving it counts its pieces as missed
-const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
+const DRAG_THRESHOLD := 14.0  # px of movement before a press counts as a drag, so a shaky tap stays a tap
 const GLIDE_RATE := 14.0     # how fast a dragged piece catches up with the finger, per second; lower trails more
 const LEAN_MAX := 12.0       # degrees a dragged piece leans into its motion at most
 const LEAN_SPEED := 1200.0   # px/s of sideways motion that gives the full lean
@@ -64,6 +64,7 @@ var _finished: Array[Dictionary] = []
 
 func _ready() -> void:
 	levels = LevelConfig.load_levels()
+	PlaySettings.load_settings()
 	color_groups = ColorGroups.load_settings()
 	ShapeView.load_size()
 	dots.colors_changed.connect(_recolor_pieces)
@@ -528,7 +529,16 @@ func _on_piece_input(event: InputEvent, p: ShapeView) -> void:
 			if not (p.placed or transitioning or drag):
 				_press_feedback(p)
 				_spot(p)
-				drag = {"p": p, "start": event.global_position, "origin": p.norm_pos, "moved": false}
+				# Selected the moment it is pressed, not on release, so it answers at once;
+				# pressing the selected piece again lets go of it on release, or at once
+				# without dragging.
+				var was_selected := selected == p
+				select(p)
+				if PlaySettings.drag:
+					drag = {"p": p, "start": event.global_position, "origin": p.norm_pos, "moved": false, "was_selected": was_selected}
+				elif was_selected:
+					deselect()
+					_resume_search()
 		elif drag and drag.p == p:
 			_end_drag()
 	elif event is InputEventMouseMotion and drag and drag.p == p:
@@ -550,9 +560,12 @@ func _end_drag() -> void:
 	var moved: bool = drag.moved
 	# Where the finger let go, which the gliding piece may not have reached yet.
 	var drop: Vector2 = drag.get("target", p.norm_pos)
+	var was_selected: bool = drag.was_selected
 	drag = {}
 	if not moved:
-		tap_piece(p)
+		if was_selected:
+			deselect()
+			_resume_search()
 		return
 
 	p.dragging = false

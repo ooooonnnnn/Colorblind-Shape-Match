@@ -28,6 +28,7 @@ const PART_NAMES := {"background": "Background dots", "shapes": "Shape dots"}
 @onready var colors_page: VBoxContainer = %ColorsPage
 @onready var shapes_page: VBoxContainer = %ShapesPage
 @onready var vision_page: VBoxContainer = %VisionPage
+@onready var other_page: VBoxContainer = %OtherPage
 @onready var back: ToyButton = %Back
 @onready var save: Button = %Save
 @onready var saved_note: Label = %SavedNote
@@ -71,6 +72,8 @@ func _ready() -> void:
 	preview.resized.connect(_layout_preview)
 	_build_colors_page()
 	_build_vision_page()
+	PlaySettings.load_settings()
+	_build_other_page()
 	back.activated.connect(func():
 		ColorVision.load_settings()  # leave unsaved changes behind
 		await get_tree().create_timer(0.15).timeout  # let the button's pop play
@@ -711,6 +714,16 @@ func _on_vision_selected(mode: String) -> void:
 	_severity_slider.editable = on
 
 
+# ---------- Other ----------
+
+func _build_other_page() -> void:
+	var card := _card(other_page, "Moving pieces",
+			"Pieces can always be moved by tapping one, then its hole. Dragging lets them be carried there too; turn it off for players who find dragging hard, so every move is two taps.")
+	var drag := _switch("Drag pieces", PlaySettings.drag)
+	drag.toggled.connect(func(on): PlaySettings.drag = on)  # the game reads the saved file, so unsaved changes stay here
+	card.add_child(drag)
+
+
 # ---------- Preview ----------
 
 ## Holes in a row inside the tray, with their pieces in a row below.
@@ -738,7 +751,7 @@ func _layout_preview() -> void:
 
 func _save() -> void:
 	var failed := false
-	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size(), ColorVision.save_settings()]:
+	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size(), ColorVision.save_settings(), PlaySettings.save_settings()]:
 		if result != OK:
 			failed = true
 			push_error("Could not save config: %s" % error_string(result))
