@@ -38,6 +38,7 @@ var color_groups := {}  # see ColorGroups.load_settings
 var hole_count := 0
 var pieces_per_shape := 0  # copies of each shape to sort into its hole
 var level_time := 0.0      # seconds; <= 0 means no time limit
+var time_bonus := false    # matches and stray taps move the deadline (see LevelConfig)
 var level_num := 0
 var score := 0
 var holes: Array[ShapeView] = []
@@ -49,6 +50,7 @@ var transitioning := false
 var board_size := Vector2.ZERO  # the board's laid-out size, known before containers sort
 var _level_id := 0  # lets a pending level change notice it was superseded
 var _chime_step := 0  # rises with each placement, resets each level
+var _stray_click := false  # a click no piece, hole or button has claimed yet (see _input)
 # Stats (see Stats): pieces finished this level, waiting to be saved, and the
 # moment the player was last free to look for a piece, so a piece's spot time
 # never includes time spent handling another one.
@@ -71,6 +73,7 @@ func _ready() -> void:
 		"size_percent": snappedf(ShapeView.side_fraction * 100, 0.01),
 	}
 	home.activated.connect(_go_home)
+	home.gui_input.connect(_claim_click)
 	resized.connect(_layout)
 	_layout()
 	new_level()
@@ -189,6 +192,7 @@ func new_level() -> void:
 	hole_count = config.holes
 	pieces_per_shape = config.shapes
 	level_time = config.duration
+	time_bonus = config.time_bonus
 	dots.visible = config.filter
 	dots.process_mode = Node.PROCESS_MODE_INHERIT if config.filter else Node.PROCESS_MODE_DISABLED
 	timer_bar.modulate.a = 1.0 if level_time > 0 else 0.0  # hidden, but keeps its place in the layout
@@ -235,6 +239,11 @@ func new_level() -> void:
 		p.gui_input.connect(_on_piece_input.bind(p))
 		pieces.append(p)
 
+	# new_level runs from a timer, after this frame's _process, so the filter
+	# would otherwise show the last level's circles for a frame, with the old
+	# tray's opening uncovering pieces.
+	if config.filter:
+		dots.refresh()
 	deadline_ms = Time.get_ticks_msec() + int(level_time * 1000)
 	transitioning = false
 	_level_started_ms = Time.get_ticks_msec()
@@ -345,6 +354,7 @@ func place(p: ShapeView) -> void:
 	)
 	_finished.append(_record(p, "found"))
 	_resume_search()
+	_add_time(LevelConfig.TIME_BONUS)
 	pieces.erase(p)
 	if pieces.is_empty():
 		score += 1
@@ -359,6 +369,34 @@ func play_chime() -> void:
 	chime.pitch_scale = pow(2.0, semitones / 12.0)
 	chime.play()
 	_chime_step += 1
+
+
+## Moves a timed level's deadline by seconds if it has time_bonus, never past
+## its full time; running out this way ends the level in _process like any other.
+func _add_time(seconds: float) -> void:
+	if level_time <= 0 or not time_bonus or transitioning:
+		return
+	var now := Time.get_ticks_msec()
+	deadline_ms = mini(deadline_ms + int(seconds * 1000), now + int(level_time * 1000))
+
+
+## Every click starts out stray; the piece, hole or Home button it lands on
+## claims it in its own input handler, which runs before _penalize_stray.
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_stray_click = true
+		_penalize_stray.call_deferred()
+
+
+func _penalize_stray() -> void:
+	if _stray_click:
+		_stray_click = false
+		_add_time(-LevelConfig.TIME_PENALTY)
+
+
+func _claim_click(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		_stray_click = false
 
 
 func reject(p: ShapeView, _hole: ShapeView) -> void:
@@ -457,6 +495,7 @@ func tap_hole(hole: ShapeView) -> void:
 
 
 func _on_hole_input(event: InputEvent, hole: ShapeView) -> void:
+	_claim_click(event)
 	var clicked: bool = event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed
 	if clicked or event.is_action_pressed("ui_accept"):
 		hole.accept_event()
@@ -476,6 +515,7 @@ func _press_feedback(view: ShapeView) -> void:
 # ---------- Drag and drop ----------
 
 func _on_piece_input(event: InputEvent, p: ShapeView) -> void:
+	_claim_click(event)
 	if event.is_action_pressed("ui_accept"):
 		p.accept_event()
 		if not (p.placed or transitioning):
