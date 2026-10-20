@@ -4,7 +4,7 @@ const Dots := preload("res://scripts/dots.gd")
 const ColorGroups := preload("res://scripts/color_groups.gd")
 const Stats := preload("res://scripts/stats.gd")
 const MIN_LOOK_MS := 10000   # how long a level must have been up before leaving it counts its pieces as missed
-const DRAG_THRESHOLD := 6.0  # px of movement before a press counts as a drag
+const DRAG_THRESHOLD := 14.0  # px of movement before a press counts as a drag, so a shaky tap stays a tap
 const GLIDE_RATE := 14.0     # how fast a dragged piece catches up with the finger, per second; lower trails more
 const LEAN_MAX := 12.0       # degrees a dragged piece leans into its motion at most
 const LEAN_SPEED := 1200.0   # px/s of sideways motion that gives the full lean
@@ -14,6 +14,11 @@ const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tr
 const EDGE_GROWTH := 1.2     # pieces swell up to this when pressed, squished or picked up
 const EDGE_GAP := 16.0       # px of full-size dots kept between a piece and the board's edge
 const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
+## The tutorial level played first when PlaySettings.tutorial is on: one piece
+## in plain sight, in a dark color everyone can see, while a TutorialHand shows
+## how to move it. It has no level number and leaves no stats or score.
+const TUTORIAL_LEVEL := {"duration": 0.0, "holes": 1, "shapes": 1, "repetitions": 1, "filter": false, "colors": "random", "time_bonus": false, "extra": 0, "extra_scored": true}
+const TUTORIAL_COLOR := Icons.INK
 
 @onready var content: VBoxContainer = $Content
 @onready var home: ToyButton = $Content/Header/Home
@@ -41,6 +46,9 @@ var level_time := 0.0      # seconds; <= 0 means no time limit
 var time_bonus := false    # matches and stray taps move the deadline (see LevelConfig)
 var extra_scored := true   # placing an extra shape counts toward clearing the level (see LevelConfig)
 var _left_to_clear := 0    # placements still needed to clear the level
+var tutorial := false      # this level is TUTORIAL_LEVEL
+var _tutorial_pending := false  # the tutorial is still to be cleared this game
+var _hand: TutorialHand
 var level_num := 0
 var score := 0
 var holes: Array[ShapeView] = []
@@ -66,6 +74,8 @@ var _finished: Array[Dictionary] = []
 
 func _ready() -> void:
 	levels = LevelConfig.load_levels()
+	PlaySettings.load_settings()
+	_tutorial_pending = PlaySettings.tutorial
 	color_groups = ColorGroups.load_settings()
 	ShapeView.load_size()
 	ExtraShapes.load_settings()
@@ -182,12 +192,14 @@ func _place_tray(rect: Rect2) -> void:
 func new_level() -> void:
 	_level_id += 1
 	_clear_board()
-	var config := _level_config(level_num + 1)
+	tutorial = _tutorial_pending
+	var config := TUTORIAL_LEVEL if tutorial else _level_config(level_num + 1)
 	if config.is_empty():
 		end_game()
 		return
 	_chime_step = 0
-	level_num += 1
+	if not tutorial:
+		level_num += 1
 	effects.clear_star()
 	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups, config.colors))
 	# Extra shapes join the level's own pieces on the board, in colors its
@@ -246,7 +258,7 @@ func new_level() -> void:
 		p.set_meta("touched_ms", -1)
 		if i < own:
 			p.set_meta("color", colors[i])
-			p.fill = dots.figure_color(colors[i])
+			p.fill = TUTORIAL_COLOR if tutorial else dots.figure_color(colors[i])
 		else:
 			p.set_meta("extra", true)
 			p.fill = extra_colors[(i - own) % extra_colors.size()]
@@ -262,13 +274,25 @@ func new_level() -> void:
 	# tray's opening uncovering pieces.
 	if config.filter:
 		dots.refresh()
+	if tutorial:
+		_hand = TutorialHand.new()
+		board.add_child(_hand)
+		_hand.play(shapes[0], TUTORIAL_COLOR, pieces[0].home, holes[0].norm_pos, PlaySettings.drag)
 	deadline_ms = Time.get_ticks_msec() + int(level_time * 1000)
 	transitioning = false
 	_level_started_ms = Time.get_ticks_msec()
 	_search_from_ms = _level_started_ms
 
 
+func _stop_hand() -> void:
+	if _hand:
+		_hand.queue_free()
+		_hand = null
+
+
 func _recolor_pieces() -> void:
+	if tutorial:
+		return
 	for p in pieces:
 		if p.has_meta("extra"):
 			continue
@@ -282,6 +306,7 @@ func _clear_board() -> void:
 	pieces.clear()
 	selected = null
 	drag = {}
+	_stop_hand()
 
 
 ## Leaves the board empty under a big star and confetti; no further levels
@@ -312,6 +337,9 @@ func end_level(cleared: bool) -> void:
 			pieces.erase(p)
 		_float_away(spare, true)
 	_finish_level()
+	_stop_hand()
+	if tutorial:
+		_tutorial_pending = false
 	var delay := 0.8
 	if cleared:
 		delay = 1.0
@@ -350,6 +378,8 @@ func _go_home() -> void:
 
 
 func _process(delta: float) -> void:
+	if _hand:
+		_hand.visible = not (drag and drag.moved)  # out of the way while the player drags
 	# A dragged piece glides after the finger instead of sticking to it.
 	# It also leans into its motion, like something carried, tipping toward the
 	# side it moves to.
@@ -399,9 +429,10 @@ func place(p: ShapeView) -> void:
 	if _counts(p):
 		_left_to_clear -= 1
 	if _left_to_clear <= 0:
-		score += 1
-		score_label.text = str(score)
-		score_star.bounce()
+		if not tutorial:
+			score += 1
+			score_label.text = str(score)
+			score_star.bounce()
 		end_level(true)
 
 
@@ -512,6 +543,9 @@ func _record(p: ShapeView, outcome: String) -> Dictionary:
 ## Saves the level's records, first recording the pieces still on the board as
 ## seen (touched) or missed if count_left.
 func _finish_level(count_left := true) -> void:
+	if tutorial:
+		_finished.clear()
+		return
 	if count_left:
 		for p in pieces:
 			_finished.append(_record(p, "seen" if p.get_meta("spot_ms") >= 0 else "missed"))
@@ -577,7 +611,16 @@ func _on_piece_input(event: InputEvent, p: ShapeView) -> void:
 			if not (p.placed or transitioning or drag):
 				_press_feedback(p)
 				_spot(p)
-				drag = {"p": p, "start": event.global_position, "origin": p.norm_pos, "moved": false}
+				# Selected the moment it is pressed, not on release, so it answers at once;
+				# pressing the selected piece again lets go of it on release, or at once
+				# without dragging.
+				var was_selected := selected == p
+				select(p)
+				if PlaySettings.drag:
+					drag = {"p": p, "start": event.global_position, "origin": p.norm_pos, "moved": false, "was_selected": was_selected}
+				elif was_selected:
+					deselect()
+					_resume_search()
 		elif drag and drag.p == p:
 			_end_drag()
 	elif event is InputEventMouseMotion and drag and drag.p == p:
@@ -599,9 +642,12 @@ func _end_drag() -> void:
 	var moved: bool = drag.moved
 	# Where the finger let go, which the gliding piece may not have reached yet.
 	var drop: Vector2 = drag.get("target", p.norm_pos)
+	var was_selected: bool = drag.was_selected
 	drag = {}
 	if not moved:
-		tap_piece(p)
+		if was_selected:
+			deselect()
+			_resume_search()
 		return
 
 	p.dragging = false

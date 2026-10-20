@@ -28,6 +28,7 @@ const PART_NAMES := {"background": "Background dots", "shapes": "Shape dots"}
 @onready var colors_page: VBoxContainer = %ColorsPage
 @onready var shapes_page: VBoxContainer = %ShapesPage
 @onready var vision_page: VBoxContainer = %VisionPage
+@onready var other_page: VBoxContainer = %OtherPage
 @onready var back: ToyButton = %Back
 @onready var save: Button = %Save
 @onready var saved_note: Label = %SavedNote
@@ -58,10 +59,13 @@ var _vision_buttons := {}  # {ColorVision mode: Button}
 var _vision_about := Label.new()
 var _severity_slider: HSlider
 var _saved_tween: Tween
+var _tutorial_card := PanelContainer.new()
+var _tutorial_summary := Label.new()
 
 
 func _ready() -> void:
 	_groups = ColorGroups.load_settings()  # the level cards offer its groups
+	PlaySettings.load_settings()  # the Levels tab shows the tutorial from it
 	var drag_scroll := DragScroll.new()  # drag anywhere on a tab to scroll it
 	drag_scroll.target = func(): return tabs.get_current_tab_control() as ScrollContainer
 	add_child(drag_scroll)
@@ -73,6 +77,7 @@ func _ready() -> void:
 	preview.resized.connect(_layout_preview)
 	_build_colors_page()
 	_build_vision_page()
+	_build_other_page()
 	back.activated.connect(func():
 		ColorVision.load_settings()  # leave unsaved changes behind
 		await get_tree().create_timer(0.15).timeout  # let the button's pop play
@@ -144,6 +149,7 @@ func _slider(parent: Control, caption: String, from: float, to: float, by: float
 
 func _build_levels_page() -> void:
 	levels_page.add_child(_note("The game plays these sequences from top to bottom. Each one plays its level the set number of times, then the next sequence starts. After the last one, the game ends with a big star."))
+	_build_tutorial_card()
 	_level_list.add_theme_constant_override("separation", 12)
 	levels_page.add_child(_level_list)
 	for entry in LevelConfig.load_levels():
@@ -153,6 +159,50 @@ func _build_levels_page() -> void:
 	add.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	add.pressed.connect(func(): _add_row(NEW_LEVEL))
 	levels_page.add_child(add)
+
+
+## The tutorial level, shown before the sequences while it is on (see the
+## Other tab); it has no controls of its own.
+func _build_tutorial_card() -> void:
+	var layout := HBoxContainer.new()
+	layout.add_theme_constant_override("separation", 16)
+	_tutorial_card.add_child(layout)
+	var badge := Label.new()
+	badge.text = "T"
+	badge.custom_minimum_size = Vector2(48, 48)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge.add_theme_font_size_override("font_size", 26)
+	var circle := StyleBoxFlat.new()
+	circle.bg_color = BADGE
+	circle.set_corner_radius_all(99)
+	circle.set_border_width_all(3)
+	circle.border_color = Icons.INK
+	badge.add_theme_stylebox_override("normal", circle)
+	layout.add_child(badge)
+	var picture := LevelPicture.new()
+	picture.custom_minimum_size = Vector2(230, 120)
+	picture.holes = 1
+	picture.pieces = 1
+	picture.filter = false
+	picture.tutorial = true
+	layout.add_child(picture)
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	layout.add_child(words)
+	_tutorial_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tutorial_summary.add_theme_font_size_override("font_size", 20)
+	words.add_child(_tutorial_summary)
+	words.add_child(_note("Turned on and off in the Other tab. It doesn't count toward the score or the stats."))
+	levels_page.add_child(_tutorial_card)
+	_refresh_tutorial_card()
+
+
+func _refresh_tutorial_card() -> void:
+	_tutorial_card.visible = PlaySettings.tutorial
+	_tutorial_summary.text = "Tutorial: 1 hole, 1 piece, in a color everyone can see.\n%s · until it's done · no time limit · no dots" % (
+			"A hand drags the piece into the hole" if PlaySettings.drag else "A hand taps the piece, then the hole")
 
 
 ## One sequence: a numbered card with a picture of its level, a sentence
@@ -766,6 +816,28 @@ func _on_vision_selected(mode: String) -> void:
 	_severity_slider.editable = on
 
 
+# ---------- Other ----------
+
+func _build_other_page() -> void:
+	var card := _card(other_page, "Moving pieces",
+			"Pieces can always be moved by tapping one, then its hole. Dragging lets them be carried there too; turn it off for players who find dragging hard, so every move is two taps.")
+	var drag := _switch("Drag pieces", PlaySettings.drag)
+	drag.toggled.connect(func(on):
+		PlaySettings.drag = on  # the game reads the saved file, so unsaved changes stay here
+		_refresh_tutorial_card()
+	)
+	card.add_child(drag)
+
+	var tutorial_card := _card(other_page, "Tutorial",
+			"Starts each game with an extra first level: one piece in a dark color everyone can see, without dots, and a hand that keeps showing how to move it, by dragging or by tapping, until it's in. It shows at the top of the Levels tab.")
+	var tutorial := _switch("Tutorial level", PlaySettings.tutorial)
+	tutorial.toggled.connect(func(on):
+		PlaySettings.tutorial = on
+		_refresh_tutorial_card()
+	)
+	tutorial_card.add_child(tutorial)
+
+
 # ---------- Preview ----------
 
 ## Holes in a row inside the tray, with their pieces in a row below.
@@ -793,7 +865,7 @@ func _layout_preview() -> void:
 
 func _save() -> void:
 	var failed := false
-	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size(), ExtraShapes.save_settings(), ColorVision.save_settings()]:
+	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size(), ExtraShapes.save_settings(), ColorVision.save_settings(), PlaySettings.save_settings()]:
 		if result != OK:
 			failed = true
 			push_error("Could not save config: %s" % error_string(result))
