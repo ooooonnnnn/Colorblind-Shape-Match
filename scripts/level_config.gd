@@ -7,10 +7,10 @@ class_name LevelConfig
 ## from ColorGroups) or "random" for a random one each level, and time_bonus
 ## makes a timed level give TIME_BONUS for each match and take TIME_PENALTY for
 ## each tap on neither a piece nor a hole, against spamming. extra is how many
-## extra shapes (see ExtraShapes) join the level's pieces on the board; the
-## level still clears after holes * shapes placements, and extra_scored is
-## whether placing an extra shape counts toward those or only the group's own
-## pieces do. Pieces left when it clears float off.
+## extra shapes (see ExtraShapes) join the level's pieces on the board, and
+## extra_scored whether they are part of the total to place: if so, every
+## piece must be placed to clear the level; if not, only its holes * shapes
+## own pieces, and extras left when it clears float off.
 
 const PATH := "res://config.json"
 const TIME_BONUS := 2.0    # seconds a right match adds, up to the level's full time
