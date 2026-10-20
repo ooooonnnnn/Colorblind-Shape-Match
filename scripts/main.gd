@@ -14,6 +14,11 @@ const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tr
 const EDGE_GROWTH := 1.2     # pieces swell up to this when pressed, squished or picked up
 const EDGE_GAP := 16.0       # px of full-size dots kept between a piece and the board's edge
 const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
+## The tutorial level played first when PlaySettings.tutorial is on: one piece
+## in plain sight, in a dark color everyone can see, while a TutorialHand shows
+## how to move it. It has no level number and leaves no stats or score.
+const TUTORIAL_LEVEL := {"duration": 0.0, "holes": 1, "shapes": 1, "repetitions": 1, "filter": false, "colors": "random", "time_bonus": false}
+const TUTORIAL_COLOR := Icons.INK
 
 @onready var content: VBoxContainer = $Content
 @onready var home: ToyButton = $Content/Header/Home
@@ -39,6 +44,9 @@ var hole_count := 0
 var pieces_per_shape := 0  # copies of each shape to sort into its hole
 var level_time := 0.0      # seconds; <= 0 means no time limit
 var time_bonus := false    # matches and stray taps move the deadline (see LevelConfig)
+var tutorial := false      # this level is TUTORIAL_LEVEL
+var _tutorial_pending := false  # the tutorial is still to be cleared this game
+var _hand: TutorialHand
 var level_num := 0
 var score := 0
 var holes: Array[ShapeView] = []
@@ -65,6 +73,7 @@ var _finished: Array[Dictionary] = []
 func _ready() -> void:
 	levels = LevelConfig.load_levels()
 	PlaySettings.load_settings()
+	_tutorial_pending = PlaySettings.tutorial
 	color_groups = ColorGroups.load_settings()
 	ShapeView.load_size()
 	dots.colors_changed.connect(_recolor_pieces)
@@ -180,12 +189,14 @@ func _place_tray(rect: Rect2) -> void:
 func new_level() -> void:
 	_level_id += 1
 	_clear_board()
-	var config := _level_config(level_num + 1)
+	tutorial = _tutorial_pending
+	var config := TUTORIAL_LEVEL if tutorial else _level_config(level_num + 1)
 	if config.is_empty():
 		end_game()
 		return
 	_chime_step = 0
-	level_num += 1
+	if not tutorial:
+		level_num += 1
 	effects.clear_star()
 	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups, config.colors))
 	dots.show_group(group)
@@ -232,7 +243,7 @@ func new_level() -> void:
 		p.set_meta("spot_ms", -1)
 		p.set_meta("wrong", 0)
 		p.set_meta("touched_ms", -1)
-		p.fill = dots.figure_color(colors[i])
+		p.fill = TUTORIAL_COLOR if tutorial else dots.figure_color(colors[i])
 		p.target_hole = holes[i % hole_count]
 		p.home = piece_spots[i] / board_size
 		p.norm_pos = p.home
@@ -245,13 +256,25 @@ func new_level() -> void:
 	# tray's opening uncovering pieces.
 	if config.filter:
 		dots.refresh()
+	if tutorial:
+		_hand = TutorialHand.new()
+		board.add_child(_hand)
+		_hand.play(shapes[0], TUTORIAL_COLOR, pieces[0].home, holes[0].norm_pos, PlaySettings.drag)
 	deadline_ms = Time.get_ticks_msec() + int(level_time * 1000)
 	transitioning = false
 	_level_started_ms = Time.get_ticks_msec()
 	_search_from_ms = _level_started_ms
 
 
+func _stop_hand() -> void:
+	if _hand:
+		_hand.queue_free()
+		_hand = null
+
+
 func _recolor_pieces() -> void:
+	if tutorial:
+		return
 	for p in pieces:
 		p.fill = dots.figure_color(p.get_meta("color"))
 
@@ -263,6 +286,7 @@ func _clear_board() -> void:
 	pieces.clear()
 	selected = null
 	drag = {}
+	_stop_hand()
 
 
 ## Leaves the board empty under a big star and confetti; no further levels
@@ -282,6 +306,9 @@ func end_level(cleared: bool) -> void:
 	transitioning = true
 	deselect()
 	_finish_level()
+	_stop_hand()
+	if tutorial:
+		_tutorial_pending = false
 	var delay := 0.8
 	if cleared:
 		delay = 1.0
@@ -312,6 +339,8 @@ func _go_home() -> void:
 
 
 func _process(delta: float) -> void:
+	if _hand:
+		_hand.visible = not (drag and drag.moved)  # out of the way while the player drags
 	# A dragged piece glides after the finger instead of sticking to it.
 	# It also leans into its motion, like something carried, tipping toward the
 	# side it moves to.
@@ -358,9 +387,10 @@ func place(p: ShapeView) -> void:
 	_add_time(LevelConfig.TIME_BONUS)
 	pieces.erase(p)
 	if pieces.is_empty():
-		score += 1
-		score_label.text = str(score)
-		score_star.bounce()
+		if not tutorial:
+			score += 1
+			score_label.text = str(score)
+			score_star.bounce()
 		end_level(true)
 
 
@@ -464,6 +494,9 @@ func _record(p: ShapeView, outcome: String) -> Dictionary:
 ## Saves the level's records, first recording the pieces still on the board as
 ## seen (touched) or missed if count_left.
 func _finish_level(count_left := true) -> void:
+	if tutorial:
+		_finished.clear()
+		return
 	if count_left:
 		for p in pieces:
 			_finished.append(_record(p, "seen" if p.get_meta("spot_ms") >= 0 else "missed"))

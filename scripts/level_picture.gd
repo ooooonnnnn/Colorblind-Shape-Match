@@ -23,6 +23,10 @@ var filter := true:
 	set(v):
 		filter = v
 		queue_redraw()
+var tutorial := false:  # pieces in the tutorial's color, with its hand pointing at the first one
+	set(v):
+		tutorial = v
+		queue_redraw()
 
 
 func _draw() -> void:
@@ -50,12 +54,13 @@ func _draw() -> void:
 
 	var piece_row := size.y * 0.08 + cell * 1.25
 	var piece_side := minf(cell * 0.32, (size.y - piece_row) / maxf(1, ceilf(pieces / 3.0)) * 0.9)
+	var piece_color := Icons.INK if tutorial else PIECE
 	for i in shown:
 		var center := Vector2(x0 + cell * (i + 0.5), tray.get_center().y)
 		_draw_shape(SHAPES[i], center, cell * 0.7, HOLE, false)
 		# Up to three pieces per row under the hole; a number when there are many.
 		if pieces > 9:
-			_draw_shape(SHAPES[i], Vector2(center.x - cell * 0.15, piece_row + piece_side / 2), piece_side, PIECE, true)
+			_draw_shape(SHAPES[i], Vector2(center.x - cell * 0.15, piece_row + piece_side / 2), piece_side, piece_color, true)
 			draw_string(get_theme_default_font(), Vector2(center.x, piece_row + piece_side * 0.8), "×%d" % pieces,
 					HORIZONTAL_ALIGNMENT_LEFT, -1, int(piece_side * 0.9), Icons.INK)
 			continue
@@ -64,7 +69,10 @@ func _draw() -> void:
 			var row := j / 3
 			var across := mini(3, pieces - row * 3)
 			var px := center.x + (col - (across - 1) / 2.0) * piece_side * 1.1
-			_draw_shape(SHAPES[i], Vector2(px, piece_row + piece_side * (row + 0.5) * 1.1), piece_side, PIECE, true)
+			_draw_shape(SHAPES[i], Vector2(px, piece_row + piece_side * (row + 0.5) * 1.1), piece_side, piece_color, true)
+	if tutorial and shown > 0:
+		var first := Vector2(x0 + cell * 0.5 - (mini(3, pieces) - 1) / 2.0 * piece_side * 1.1, piece_row + piece_side * 0.55)
+		TutorialHand.draw_hand(self, first + Vector2(piece_side * 0.15, piece_side * 0.1), piece_side * 0.012)
 	if holes > shown:
 		draw_string(get_theme_default_font(), Vector2(tray.end.x + 4, tray.get_center().y + 6), "+%d" % (holes - shown),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Icons.INK)

@@ -1,10 +1,12 @@
 class_name PlaySettings
 ## How pieces are moved, kept in PATH. Pieces can always be tapped, then their
-## hole; drag also lets them be carried there.
+## hole; drag also lets them be carried there. tutorial starts each game with a
+## level where a hand shows how (see main.gd and TutorialHand).
 
 const PATH := "res://play.json"
 
 static var drag := true
+static var tutorial := false
 
 
 static func load_settings() -> void:
@@ -13,11 +15,12 @@ static func load_settings() -> void:
 		push_error("Bad or missing play settings in %s" % PATH)
 		return
 	drag = bool(data.get("drag", drag))
+	tutorial = bool(data.get("tutorial", tutorial))
 
 
 static func save_settings() -> Error:
 	var file := FileAccess.open(SettingsFile.write_path(PATH), FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
-	file.store_string(JSON.stringify({"drag": drag}, "\t", false) + "\n")
+	file.store_string(JSON.stringify({"drag": drag, "tutorial": tutorial}, "\t", false) + "\n")
 	return OK
