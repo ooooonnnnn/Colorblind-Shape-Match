@@ -51,6 +51,8 @@ var severity := 1.0:  # 0 is normal vision, 1 the full form
 		severity = clampf(v, 0.0, 1.0)
 		_apply()
 
+static var _simulations := {}  # simulation's results by type, as they never change
+
 var _screen := ColorRect.new()
 
 
@@ -123,6 +125,8 @@ static func _rgb_to_lms() -> Basis:
 ## sRGB, one for each side of the plane through white along the missing cone,
 ## and that plane's normal; colors where dot(separation, rgb) >= 0 take side_a.
 static func simulation(type: String) -> Dictionary:
+	if _simulations.has(type):
+		return _simulations[type]
 	var info: Dictionary = TYPES[type]
 	var k: int = info.cone
 	var to_lms := _rgb_to_lms()
@@ -144,7 +148,21 @@ static func simulation(type: String) -> Dictionary:
 		rows[k] = row
 		var project := Basis(rows[0], rows[1], rows[2]).transposed()
 		sides.append(to_lms.inverse() * project * to_lms)
-	return {"side_a": sides[0], "side_b": sides[1], "separation": to_lms.transposed() * separation}
+	_simulations[type] = {"side_a": sides[0], "side_b": sides[1], "separation": to_lms.transposed() * separation}
+	return _simulations[type]
+
+
+## color with one cone (0 L, 1 M, 2 S) scaled by factor and the other two as
+## they were, or null when that is outside sRGB.
+static func shift_cone(color: Color, cone: int, factor: float) -> Variant:
+	var c := color.srgb_to_linear()
+	var to_lms := _rgb_to_lms()
+	var lms := to_lms * Vector3(c.r, c.g, c.b)
+	lms[cone] *= factor
+	var rgb := to_lms.inverse() * lms
+	if rgb != rgb.clamp(Vector3.ZERO, Vector3.ONE):
+		return null
+	return Color(rgb.x, rgb.y, rgb.z).linear_to_srgb()
 
 
 ## How color looks to type, at severity (0 normal vision, 1 the full form).

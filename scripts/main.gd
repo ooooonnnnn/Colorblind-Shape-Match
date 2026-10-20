@@ -39,6 +39,8 @@ var hole_count := 0
 var pieces_per_shape := 0  # copies of each shape to sort into its hole
 var level_time := 0.0      # seconds; <= 0 means no time limit
 var time_bonus := false    # matches and stray taps move the deadline (see LevelConfig)
+var extra_scored := true   # placing an extra shape counts toward clearing the level (see LevelConfig)
+var _left_to_clear := 0    # placements still needed to clear the level
 var level_num := 0
 var score := 0
 var holes: Array[ShapeView] = []
@@ -66,6 +68,7 @@ func _ready() -> void:
 	levels = LevelConfig.load_levels()
 	color_groups = ColorGroups.load_settings()
 	ShapeView.load_size()
+	ExtraShapes.load_settings()
 	dots.colors_changed.connect(_recolor_pieces)
 	_session_info = {
 		"start": _session,
@@ -187,7 +190,18 @@ func new_level() -> void:
 	level_num += 1
 	effects.clear_star()
 	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups, config.colors))
-	dots.show_group(group)
+	# Extra shapes join the level's own pieces on the board, in colors its
+	# group's type sees as well as anyone (see ExtraShapes), but the level still
+	# clears after as many placements as it has own pieces.
+	var own: int = config.holes * config.shapes
+	var extra_colors: Array[Color] = []
+	if config.extra > 0:
+		extra_colors = ColorGroups.extra_colors(group, ExtraShapes.difference)
+	var extra_count: int = config.extra if not extra_colors.is_empty() else 0
+	var total := own + extra_count
+	extra_scored = config.extra_scored
+	_left_to_clear = own
+	dots.show_group(group, PackedColorArray(extra_colors))
 	_level_group = group.id if config.filter else Stats.BASELINE
 	hole_count = config.holes
 	pieces_per_shape = config.shapes
@@ -196,7 +210,7 @@ func new_level() -> void:
 	dots.visible = config.filter
 	dots.process_mode = Node.PROCESS_MODE_INHERIT if config.filter else Node.PROCESS_MODE_DISABLED
 	timer_bar.modulate.a = 1.0 if level_time > 0 else 0.0  # hidden, but keeps its place in the layout
-	pips.total = hole_count * pieces_per_shape
+	pips.total = own
 
 	var shapes := Shapes.pick(hole_count)
 	var side := ShapeView.side_for(board_size)
@@ -207,7 +221,7 @@ func new_level() -> void:
 	# shape; keeping that inside the board stops it showing beyond the dot filter.
 	var outline_reach := side * ShapeView.outline_percent / 200
 	var piece_radii: Array[float] = []
-	for i in hole_count * pieces_per_shape:
+	for i in total:
 		piece_radii.append(hole_radii[i % hole_count] + outline_reach)
 	var hole_spots := _hole_row(hole_radii, hole_radii.max() * 2)
 	# Holes are drawn as big as a piece's outer edge, so the tray leaves room for that.
@@ -223,15 +237,19 @@ func new_level() -> void:
 		hole.gui_input.connect(_on_hole_input.bind(hole))
 		holes.append(hole)
 
-	var colors := ColorGroups.piece_colors(group.colors.size(), hole_count, piece_radii.size())
+	var colors := ColorGroups.piece_colors(group.colors.size(), hole_count, own)
 	for i in piece_radii.size():
 		var p := ShapeView.new()
 		p.setup(shapes[i % hole_count], true)
-		p.set_meta("color", colors[i])
 		p.set_meta("spot_ms", -1)
 		p.set_meta("wrong", 0)
 		p.set_meta("touched_ms", -1)
-		p.fill = dots.figure_color(colors[i])
+		if i < own:
+			p.set_meta("color", colors[i])
+			p.fill = dots.figure_color(colors[i])
+		else:
+			p.set_meta("extra", true)
+			p.fill = extra_colors[(i - own) % extra_colors.size()]
 		p.target_hole = holes[i % hole_count]
 		p.home = piece_spots[i] / board_size
 		p.norm_pos = p.home
@@ -252,6 +270,8 @@ func new_level() -> void:
 
 func _recolor_pieces() -> void:
 	for p in pieces:
+		if p.has_meta("extra"):
+			continue
 		p.fill = dots.figure_color(p.get_meta("color"))
 
 
@@ -280,6 +300,17 @@ func end_game() -> void:
 func end_level(cleared: bool) -> void:
 	transitioning = true
 	deselect()
+	if cleared:
+		# Extra shapes left over float off unrecorded, as the level never needed
+		# them. Any of the group's own pieces left (extras took their place)
+		# are recorded as usual.
+		var spare: Array[ShapeView] = []
+		for p in pieces:
+			if p.has_meta("extra"):
+				spare.append(p)
+		for p in spare:
+			pieces.erase(p)
+		_float_away(spare, true)
 	_finish_level()
 	var delay := 0.8
 	if cleared:
@@ -290,15 +321,23 @@ func end_level(cleared: bool) -> void:
 		fanfare.play()
 	else:
 		whoosh.play()
-		for p in pieces:
-			var t := p.create_tween().set_parallel().set_trans(Tween.TRANS_SINE)
-			t.tween_property(p, "modulate:a", 0.0, 0.5)
-			t.tween_property(p, "visual_scale", 0.4, 0.5)
+	_float_away(pieces)  # anything left, as a cleared level may not need every piece
 	var id := _level_id
 	get_tree().create_timer(delay).timeout.connect(func():
 		if id == _level_id:
 			new_level()
 	)
+
+
+## Fades and shrinks views away, then frees them if free, for views no longer
+## in pieces, which _clear_board would otherwise free.
+func _float_away(views: Array[ShapeView], free := false) -> void:
+	for p in views:
+		var t := p.create_tween().set_parallel().set_trans(Tween.TRANS_SINE)
+		t.tween_property(p, "modulate:a", 0.0, 0.5)
+		t.tween_property(p, "visual_scale", 0.4, 0.5)
+		if free:
+			t.chain().tween_callback(p.queue_free)
 
 
 func _go_home() -> void:
@@ -343,7 +382,8 @@ func place(p: ShapeView) -> void:
 	p.z_index = 1
 	p.vanish_into(p.target_hole.norm_pos)
 	play_chime()
-	pips.add_one()
+	if _counts(p):
+		pips.add_one()
 	# The hole pulses with a sparkle as the piece arrives.
 	var hole := p.target_hole
 	get_tree().create_timer(0.2).timeout.connect(func():
@@ -356,11 +396,19 @@ func place(p: ShapeView) -> void:
 	_resume_search()
 	_add_time(LevelConfig.TIME_BONUS)
 	pieces.erase(p)
-	if pieces.is_empty():
+	if _counts(p):
+		_left_to_clear -= 1
+	if _left_to_clear <= 0:
 		score += 1
 		score_label.text = str(score)
 		score_star.bounce()
 		end_level(true)
+
+
+## Whether placing p counts toward clearing the level: every piece but extra
+## shapes in a level whose extras do not count.
+func _counts(p: ShapeView) -> bool:
+	return extra_scored or not p.has_meta("extra")
 
 
 func play_chime() -> void:
@@ -449,8 +497,9 @@ func _record(p: ShapeView, outcome: String) -> Dictionary:
 	return {
 		"session": _session,
 		"level": level_num,
-		"group": _level_group,
+		"group": Stats.EXTRA if p.has_meta("extra") and _level_group != Stats.BASELINE else _level_group,
 		"filter": _level_group != Stats.BASELINE,
+		"extra": p.has_meta("extra"),
 		"shape": p.shape_name,
 		"color": p.fill.to_html(false),
 		"outcome": outcome,

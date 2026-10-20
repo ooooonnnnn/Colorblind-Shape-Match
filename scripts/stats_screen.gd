@@ -17,6 +17,7 @@ const LEVEL_NAMES := {"none": "Not enough play", "ok": "Looks fine", "watch": "W
 const MUTED := Color(0.231373, 0.184314, 0.290196, 0.7)  # Icons.INK, for captions
 const TRACK := Color(0.231373, 0.184314, 0.290196, 0.12)  # empty part of a chart
 const BASELINE_PLATE := {"background": Color("c9ccd3"), "colors": [Color("3b2f4a")]}  # the shapes in plain sight
+const EXTRA_PLATE := {"background": Color("559c68"), "colors": [Color("6693ab"), Color("4d9f37")]}  # off the confusion lines
 
 @onready var summary_label: Label = %Summary
 @onready var cards: VBoxContainer = %Cards
@@ -93,16 +94,18 @@ func _build() -> void:
 	if summary.usual_ms >= 0:
 		summary_label.text += " · usual spot time %.2f s, late past %.1f s" % [summary.usual_ms / 1000.0, summary.late_ms / 1000.0]
 
-	# The groups in use, then any recorded group no longer in use, then the baseline.
+	# The groups in use, then any recorded group no longer in use, then extra shapes and the baseline.
 	var groups: Array = ColorGroups.active(ColorGroups.load_settings()).duplicate()
 	for article in ColorGroups.ARTICLE:
 		if summary.groups.has(article.id) and not groups.any(func(g): return g.id == article.id):
 			groups.append(article)
-	var names := {Stats.BASELINE: "No filter"}
+	var names := {Stats.BASELINE: "No filter", Stats.EXTRA: "Extra shapes"}
 	for group in groups:
 		names[group.id] = group.name
 	for group in groups:
 		_add_card(summary, group.id, group.name, "%s · %s" % [group.kind, group.prevalence], group, names)
+	if summary.groups.has(Stats.EXTRA):
+		_add_card(summary, Stats.EXTRA, names[Stats.EXTRA], "Control: shapes every type can see, in the filtered levels", EXTRA_PLATE, names)
 	_add_card(summary, Stats.BASELINE, names[Stats.BASELINE], "Baseline: levels with the Ishihara filter off", BASELINE_PLATE, names)
 
 

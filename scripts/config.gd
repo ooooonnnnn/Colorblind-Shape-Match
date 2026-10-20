@@ -15,7 +15,7 @@ const MATCH_OK := Color("4caf7a")
 const MATCH_OFF := Color("e8a33d")
 const PREVIEW_SPACING := 16.0  # px between neighbouring preview shapes
 const TRAY_PADDING := 24.0     # px between the holes and the tray edge, as in the game
-const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1, "filter": true, "colors": "random", "time_bonus": true}
+const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1, "filter": true, "colors": "random", "time_bonus": true, "extra": 0, "extra_scored": true}
 const BADGE := Color("ffd166")
 const REMOVE := Color("ffb4a2")
 const MUTED := Color(0.231373, 0.184314, 0.290196, 0.7)  # Icons.INK, for explanations
@@ -41,6 +41,8 @@ var _dot_sliders := {}  # {max_radius, gap, fill: HSlider}
 var _noise_sliders := {}  # {part: {channel: {wavelength, amplitude}}} of HSliders, as in Dots.noise
 var _size_slider: HSlider
 var _outline_slider: HSlider
+var _extra_slider: HSlider
+var _extra_swatches := VBoxContainer.new()  # each color group's extra-shape colors
 var _board_color := ColorPickerButton.new()
 var _groups := {}  # see ColorGroups.load_settings
 var _cards := {}  # {group id: {group, plate, bars: match bar per figure color}}
@@ -210,6 +212,8 @@ func _add_row(entry: Dictionary) -> void:
 		"repetitions": Stepper.new("Times to play", 1, 99, entry.repetitions if entry.repetitions > 0 else 1),
 		"filter": _switch("Dots filter", entry.filter),
 		"colors": OptionButton.new(),
+		"extra": Stepper.new("Extra shapes", 0, 20, entry.extra),
+		"extra_scored": _switch("Extras count toward score", entry.extra_scored),
 	}
 	row.colors.set_meta("choice", entry.colors)
 	_fill_color_choices(row.colors)
@@ -229,9 +233,12 @@ func _add_row(entry: Dictionary) -> void:
 	controls.add_child(_stack([row.forever, row.repetitions]))
 	controls.add_child(_stack([row.filter]))
 	controls.add_child(_stack([colors_label, row.colors]))
-	for stepper in [row.holes, row.shapes, row.duration, row.repetitions]:
+	row.extra.tooltip_text = "Extra pieces on the board, in colors the group's type of color blindness can see. The level still clears after as many placements as it has pieces."
+	row.extra_scored.tooltip_text = "On: placing an extra shape counts toward clearing the level. Off: only the group's own pieces count."
+	controls.add_child(_stack([row.extra, row.extra_scored]))
+	for stepper in [row.holes, row.shapes, row.duration, row.repetitions, row.extra]:
 		stepper.changed.connect(func(_v): _refresh_rows())
-	for switch in [row.time_on, row.time_bonus, row.forever, row.filter]:
+	for switch in [row.time_on, row.time_bonus, row.forever, row.filter, row.extra_scored]:
 		switch.toggled.connect(func(_on): _refresh_rows())
 
 	var remove := ToyButton.new()
@@ -305,15 +312,19 @@ func _refresh_rows() -> void:
 		row.duration.editable = row.time_on.button_pressed
 		row.time_bonus.disabled = not row.time_on.button_pressed
 		row.repetitions.editable = not row.forever.button_pressed
+		var extra := int(row.extra.value)
+		row.extra_scored.disabled = extra == 0
 		row.remove.disabled = _rows.size() == 1
-		row.summary.text = "%d %s, %d %s for each.\n%s · %s · %s · %s" % [
+		row.summary.text = "%d %s, %d %s for each.\n%s · %s · %s · %s%s" % [
 				holes, "hole" if holes == 1 else "holes", pieces, "piece" if pieces == 1 else "pieces",
 				("%d seconds per level" % row.duration.value + (", +%d s a match, −%d s a stray tap" % [LevelConfig.TIME_BONUS, LevelConfig.TIME_PENALTY]
 						if row.time_bonus.button_pressed else "")) if row.time_on.button_pressed else "No time limit",
 				"plays forever" if row.forever.button_pressed else ("plays once" if row.repetitions.value == 1 else "plays %d times" % row.repetitions.value),
 				"dots on" if row.filter.button_pressed else "no dots",
 				row.colors.get_item_text(row.colors.selected).to_lower() if row.colors.get_meta("choice") == ColorGroups.RANDOM
-						else "%s colors" % row.colors.get_item_text(row.colors.selected).get_slice(" (", 0)]
+						else "%s colors" % row.colors.get_item_text(row.colors.selected).get_slice(" (", 0),
+				"" if extra == 0 else "\n+ %d extra %s on the board, %s; %d to place to clear" % [extra, "shape" if extra == 1 else "shapes",
+						"counted in the score" if row.extra_scored.button_pressed else "not counted", holes * pieces]]
 		var reached := endless_at < 0
 		row.card.modulate.a = 1.0 if reached else 0.5
 		row.unreached.visible = not reached
@@ -333,6 +344,8 @@ func _levels() -> Array[Dictionary]:
 			"filter": row.filter.button_pressed,
 			"colors": row.colors.get_meta("choice"),
 			"time_bonus": row.time_bonus.button_pressed,
+			"extra": int(row.extra.value),
+			"extra_scored": row.extra_scored.button_pressed,
 		})
 	return levels
 
@@ -430,6 +443,16 @@ func _build_shapes_page() -> void:
 	_outline_slider = _slider(outline_card, "Thickness", 1, 50, 0.5, ShapeView.outline_percent,
 			func(v): return "%s%%" % (str(int(v)) if v == int(v) else "%.1f" % v), _on_outline_changed)
 
+	ExtraShapes.load_settings()
+	var extra_card := _card(shapes_page, "Extra shapes",
+			"Pieces in colors outside the level's color group, which that group's type of color blindness sees as well as anyone. They fit the holes like the other pieces, so a player who finds them but misses the group's pieces is missing color, not attention. How many each level has, and whether they count toward the score, is set per sequence on the Levels tab. The stats keep them apart.")
+	_extra_slider = _slider(extra_card, "How easy to see", 5, 80, 1, ExtraShapes.difference,
+			func(v): return "%d" % v, _on_extra_changed)
+	extra_card.add_child(_note("How different they look from the background to the group's type, as a CIELAB distance: around 10 is subtle, 40 and up is plain to see. Their colors for each group:"))
+	_extra_swatches.add_theme_constant_override("separation", 6)
+	extra_card.add_child(_extra_swatches)
+	_on_extra_changed()
+
 
 func _on_size_changed() -> void:
 	ShapeView.side_fraction = _size_slider.value / 100
@@ -441,6 +464,35 @@ func _on_outline_changed() -> void:
 	for view in _holes + _pieces:
 		view.queue_redraw()
 	_layout_preview()  # holes grow with the outline, and the tray with them
+
+
+func _on_extra_changed() -> void:
+	ExtraShapes.difference = _extra_slider.value
+	_show_extra_colors()
+
+
+## Swatches of the extra-shape colors each color group in use would get.
+func _show_extra_colors() -> void:
+	for child in _extra_swatches.get_children():
+		child.queue_free()
+	for group in ColorGroups.active(_groups):
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var label := Label.new()
+		label.text = group.name
+		label.custom_minimum_size = Vector2(120, 0)
+		row.add_child(label)
+		var colors := ColorGroups.extra_colors(group, ExtraShapes.difference)
+		for color in colors:
+			var swatch := ColorRect.new()
+			swatch.color = color
+			swatch.custom_minimum_size = Vector2(44, 28)
+			swatch.tooltip_text = "#%s, which %s players see %d apart from the background" % [color.to_html(false), group.name,
+					roundi(ColorGroups.seen_difference(group.id, color, group.background))]
+			row.add_child(swatch)
+		if colors.is_empty():
+			row.add_child(_note("No color found, so its levels get no extra shapes."))
+		_extra_swatches.add_child(row)
 
 
 # ---------- Color groups ----------
@@ -508,6 +560,8 @@ func _rebuild_groups() -> void:
 	for row in _rows:
 		_fill_color_choices(row.colors)
 	_refresh_rows()
+	if _extra_slider:
+		_show_extra_colors()
 	_groups_note.text = ("These are your own colors: click a color to change it, + to add a piece color and × to remove one." if _groups.custom
 			else "These colors come from the research and can't be changed. Pick \"My own colors\" to edit a copy of them.")
 	_restore_groups.visible = _groups.custom
@@ -620,6 +674,7 @@ func _swatch(group: Dictionary, i: int, editable: bool, swatch_size: Vector2) ->
 func _on_group_color_changed(color: Color, group: Dictionary, i: int) -> void:
 	if i < 0:
 		group.background = color
+		_show_extra_colors()  # they are worked out from the background
 	else:
 		group.colors[i] = color
 	_update_cards()
@@ -738,7 +793,7 @@ func _layout_preview() -> void:
 
 func _save() -> void:
 	var failed := false
-	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size(), ColorVision.save_settings()]:
+	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size(), ExtraShapes.save_settings(), ColorVision.save_settings()]:
 		if result != OK:
 			failed = true
 			push_error("Could not save config: %s" % error_string(result))

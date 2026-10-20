@@ -23,7 +23,8 @@ extends RefCounted
 const Vision := preload("res://scripts/color_vision.gd")
 const PATH := "res://color_groups.json"
 const RANDOM := "random"  # a level sequence's colors setting that picks a new group every level
-const MAX_COLORS := 6  # figure colors per group; must match BASE_COUNT - 1 in dot_circle.gdshader
+const MAX_COLORS := 6  # figure colors per group
+const MAX_EXTRA_COLORS := 2  # colors for extra shapes; with MAX_COLORS, must match BASE_COUNT - 1 in dot_circle.gdshader
 const MATCH_TOLERANCE := 5.0  # CIELAB distance a color may show from its background, to its type, and still blend in
 
 const ARTICLE := [
@@ -152,6 +153,35 @@ static func piece_colors(palette_size: int, shape_count: int, piece_count: int) 
 	for i in piece_count:
 		indices.append(order[(i % shape_count + i / shape_count) % used])
 	return indices
+
+
+## Up to MAX_EXTRA_COLORS colors for extra shapes (see ExtraShapes) in group:
+## its background with one of the cones its type still has raised or lowered,
+## until that type sees it about difference (CIELAB) from the background, or
+## as far as sRGB allows. Being off the type's confusion lines, they show to
+## it and to normal vision alike. The colors closest to difference are picked.
+static func extra_colors(group: Dictionary, difference: float) -> Array[Color]:
+	var missing: int = Vision.TYPES[group.id].cone if Vision.TYPES.has(group.id) else -1
+	var found: Array[Dictionary] = []
+	for cone in 3:
+		if cone == missing:
+			continue
+		for direction in [1.0, -1.0]:
+			var best := {}
+			for step in range(1, 400):
+				var color = Vision.shift_cone(group.background, cone, 1.0 + direction * step * 0.01)
+				if color == null:
+					break
+				best = {"color": color, "seen": seen_difference(group.id, color, group.background)}
+				if best.seen >= difference:
+					break
+			if best:
+				found.append(best)
+	found.sort_custom(func(a, b): return minf(a.seen, difference) > minf(b.seen, difference))
+	var colors: Array[Color] = []
+	for entry in found.slice(0, MAX_EXTRA_COLORS):
+		colors.append(entry.color)
+	return colors
 
 
 ## How far apart color and background look to the type of color blindness

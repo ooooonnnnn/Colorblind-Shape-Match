@@ -4,7 +4,7 @@ shader_type canvas_item;
 // with the background color otherwise. The color's hue, saturation and value
 // are then each shifted by their own Perlin noise, read at the circle's center.
 
-const int BASE_COUNT = 7;        // background, then up to ColorGroups.MAX_COLORS figure colors
+const int BASE_COUNT = 9;        // background, up to ColorGroups.MAX_COLORS figure colors, then MAX_EXTRA_COLORS extra-shape colors
 const float MATCH = 0.08;        // how close the screen must be to a shape color to count as it
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_nearest;

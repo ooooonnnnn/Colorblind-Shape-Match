@@ -48,6 +48,8 @@ const NOISE_CHANNELS := ["hue", "saturation", "value"]
 @export var background_color := Color("559c68")
 ## The colors pieces are filled with, at most ColorGroups.MAX_COLORS.
 @export var figure_colors := PackedColorArray([Color("b59267"), Color("c98e67"), Color("db8b67"), Color("eb8767"), Color("fa8366")])
+## The colors of the level's extra shapes, at most ColorGroups.MAX_EXTRA_COLORS.
+@export var extra_colors := PackedColorArray()
 
 var max_radius: float = DEFAULT_CONFIG.max_radius  # px
 var gap: float = DEFAULT_CONFIG.gap                # px between neighbouring circles
@@ -179,10 +181,12 @@ func save_noise() -> Error:
 	return OK
 
 
-## Takes a color group's background and figure colors (see ColorGroups).
-func show_group(group: Dictionary) -> void:
+## Takes a color group's background and figure colors (see ColorGroups), and
+## the level's extra-shape colors, if any.
+func show_group(group: Dictionary, extra := PackedColorArray()) -> void:
 	background_color = group.background
 	figure_colors = PackedColorArray(group.colors)
+	extra_colors = extra
 
 
 ## Figure color i, which a piece is filled with and its circles are based on.
@@ -190,12 +194,13 @@ func figure_color(i: int) -> Color:
 	return figure_colors[i % figure_colors.size()]
 
 
-## The background color, then the figure colors, padded to the shader's count
-## with colors no screen pixel comes near.
+## The background color, then the figure and extra-shape colors, padded to
+## the shader's count with colors no screen pixel comes near.
 func _base_colors() -> PackedColorArray:
 	var colors := PackedColorArray([background_color])
 	colors.append_array(figure_colors.slice(0, ColorGroups.MAX_COLORS))
-	while colors.size() < ColorGroups.MAX_COLORS + 1:
+	colors.append_array(extra_colors.slice(0, ColorGroups.MAX_EXTRA_COLORS))
+	while colors.size() < ColorGroups.MAX_COLORS + ColorGroups.MAX_EXTRA_COLORS + 1:
 		colors.append(Color(10, 10, 10))
 	return colors
 

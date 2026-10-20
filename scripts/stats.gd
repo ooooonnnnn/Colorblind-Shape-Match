@@ -2,10 +2,12 @@ extends RefCounted
 ## Play statistics: one record per piece, kept across sessions in PATH, and
 ## the article-based reading of them shown on the stats screen.
 ##
-## Each record is {session, level, group, filter, shape, color, outcome,
+## Each record is {session, level, group, filter, extra, shape, color, outcome,
 ## spot_ms, wrong, touched_ms}:
 ##   session  unix time the game scene was opened
-##   group    color group id, or BASELINE for levels with the dot filter off
+##   group    color group id, BASELINE for levels with the dot filter off, or
+##            EXTRA for extra shapes in levels with it on
+##   extra    an extra shape (see ExtraShapes); missing in older records
 ##   outcome  "found" (placed), "seen" (touched but never placed) or "missed"
 ##            (never touched before the level ended)
 ##   spot_ms  search time before the piece was first touched, or -1; it only
@@ -33,6 +35,7 @@ extends RefCounted
 
 const PATH := "user://stats.json"
 const BASELINE := "baseline"
+const EXTRA := "extra"  # extra shapes under the filter: a control the level's type can see
 const HESITATION_MS := 30000  # the article's "taking over 30 seconds to identify a plate"
 const MIN_PIECES := 5         # pieces a group needs before it gets a reading
 const MISS_FLAG := 0.5        # miss rate that reads as failing the screen
@@ -113,17 +116,17 @@ static func workbook(records: Array, sessions: Dictionary) -> Array:
 				rows.append([_bold("%s noise: %s wavelength (px)" % [part[1], channel[1]]), _number(noise.get("wavelength"))])
 		rows.append([_bold("Shape size (% of the board's shorter side)"), _number(s.get("size_percent"))])
 		rows.append([])
-		rows.append([_bold("Shape type"), _bold("Color (hex)"), _bold("Touched"), _bold("Time from level start to touch (s)")])
+		rows.append([_bold("Shape type"), _bold("Color (hex)"), _bold("Touched"), _bold("Time from level start to touch (s)"), _bold("Extra shape")])
 		for r in by_session[id]:
 			var touched: bool = r.outcome != "missed"
 			var time = "unknown"
 			if r.has("touched_ms"):
 				time = snappedf(r.touched_ms / 1000.0, 0.001) if r.touched_ms >= 0 else null
-			rows.append([r.shape, "#" + str(r.color), "yes" if touched else "no", time])
+			rows.append([r.shape, "#" + str(r.color), "yes" if touched else "no", time, "yes" if r.get("extra", false) else "no"])
 		sheets.append({
 			"name": "%d - %s" % [n + 1, _local_time(int(id)).replace(":", ".")],
 			"rows": rows,
-			"widths": [44, 18, 10, 34],
+			"widths": [44, 18, 10, 34, 12],
 		})
 	return sheets
 
@@ -242,6 +245,13 @@ static func reading(summary: Dictionary, id: String, names: Dictionary) -> Dicti
 			lines.append("Missed or was slow on %d%% even without the filter, so trouble elsewhere may come from attention or the game itself rather than color vision." % roundi(rate * 100))
 		else:
 			lines.append("Found the shapes without the filter. Like the article's demonstration plates, this shows the child can do the task, so misses with the filter point to color.")
+		return {"level": level, "lines": lines}
+	if id == EXTRA:
+		if rate >= 0.3:
+			level = "watch"
+			lines.append("Missed or was slow on %d%% of the extra shapes, which every type can see, so trouble in the same levels may come from attention rather than color vision." % roundi(rate * 100))
+		else:
+			lines.append("Found the extra shapes, which every type can see, in the same levels as the color groups: misses of a group's pieces there point to color.")
 		return {"level": level, "lines": lines}
 
 	if rate >= MISS_FLAG:
