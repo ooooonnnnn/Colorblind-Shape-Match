@@ -100,7 +100,11 @@ holes would not fit across the board.
   JDK 17 in `AppData/Local/Programs/Java`, SDK in `AppData/Local/Android/Sdk`,
   debug keystore in `AppData/Roaming/Godot/keystores`). There is no release
   keystore, so export debug:
-  `<godot> --headless --path . --export-debug "Android" "Apks/<name>.apk"`.
+  `<godot> --headless --path . --export-debug "Android" "builds/android/<name>.apk"`.
+  Web, Windows, macOS and Linux export with `--export-release` and their preset
+  names into `builds/web`, `builds/windows`, `builds/mac`, `builds/linux`
+  (git-ignored); zip `builds/web` for itch. The Java SDK path must be set in
+  Godot's editor settings for Android.
 - Quick checks, with `<godot>` the console exe:
   - `<godot> --headless --path . --import` after adding a `class_name` script.
   - `<godot> --headless --path . --quit-after 90 res://main.tscn` (and
