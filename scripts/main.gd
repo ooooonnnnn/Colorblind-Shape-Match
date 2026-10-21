@@ -11,6 +11,7 @@ const LEAN_SPEED := 1200.0   # px/s of sideways motion that gives the full lean
 const LEAN_RATE := 10.0      # how fast the lean follows changes in motion, per second
 const SPACING := 16.0        # px of clear space between bounding circles at the start of a level
 const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tray edge
+const TRAY_INSET := 16.0     # px between the tray and the bottom of the board
 const EDGE_GROWTH := 1.2     # pieces swell up to this when pressed, squished or picked up
 const EDGE_GAP := 16.0       # px of full-size dots kept between a piece and the board's edge
 const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
@@ -21,11 +22,9 @@ const TUTORIAL_LEVEL := {"duration": 0.0, "holes": 1, "shapes": 1, "repetitions"
 const TUTORIAL_COLOR := Icons.INK
 
 @onready var content: VBoxContainer = $Content
-@onready var home: ToyButton = $Content/Header/Home
-@onready var pips: ProgressPips = $Content/Header/Pips
-@onready var score_star: StarBadge = $Content/Header/ScoreStar
-@onready var score_label: Label = $Content/Header/ScoreValue
-@onready var timer_bar: TimerBar = $Content/TimerBar
+@onready var home: ToyButton = $Content/Footer/Home
+@onready var star_bar: StarBar = $Content/StarBar
+@onready var timer_bar: TimerBar = $Content/Footer/TimerBar
 @onready var board: Panel = $Content/Board
 @onready var tray: Panel = $Content/Board/Tray
 @onready var uh_uh: AudioStreamPlayer = $UhUh
@@ -93,9 +92,10 @@ func _ready() -> void:
 
 
 func _layout() -> void:
-	# 16 px top margin, 72 px header, 18 px timer and 12 px gaps above the board,
-	# 24 px margins at the sides and below, which leaves room for its frame.
-	board_size = Vector2(maxf(size.x - 48, 200), maxf(size.y - 154, 200))
+	# 16 px margins above and below, the 64 px star bar on top and the 72 px
+	# footer (Home and the timer) below, 20 px gaps that leave room for the
+	# board's frame, and 24 px margins at the sides.
+	board_size = Vector2(maxf(size.x - 48, 200), maxf(size.y - 208, 200))
 	board.custom_minimum_size = board_size
 	content.position = Vector2(24, 16)
 	content.size = Vector2(board_size.x, 0)
@@ -115,17 +115,17 @@ func _level_config(n: int) -> Dictionary:
 
 # ---------- Layout ----------
 
-## Pixel centers for the holes, in a row centered on the board. The gap between
+## Pixel centers for the holes, in a row centered across the board at height y. The gap between
 ## neighbours' bounding circles is wider than the widest piece, so no piece can
 ## touch two holes at once.
-func _hole_row(radii: Array[float], widest_piece: float) -> Array[Vector2]:
+func _hole_row(radii: Array[float], widest_piece: float, y: float) -> Array[Vector2]:
 	var xs: Array[float] = [0.0]
 	for i in range(1, radii.size()):
 		xs.append(xs[i - 1] + radii[i - 1] + radii[i] + widest_piece + SPACING)
 	var row_center := (xs[-1] + radii[-1] - radii[0]) / 2
 	var spots: Array[Vector2] = []
 	for x in xs:
-		spots.append(board_size / 2 + Vector2(x - row_center, 0))
+		spots.append(Vector2(board_size.x / 2 + x - row_center, y))
 	return spots
 
 
@@ -222,7 +222,7 @@ func new_level() -> void:
 	dots.visible = config.filter
 	dots.process_mode = Node.PROCESS_MODE_INHERIT if config.filter else Node.PROCESS_MODE_DISABLED
 	timer_bar.modulate.a = 1.0 if level_time > 0 else 0.0  # hidden, but keeps its place in the layout
-	pips.total = _left_to_clear
+	star_bar.total = _left_to_clear
 
 	var shapes := Shapes.pick(hole_count)
 	var side := ShapeView.side_for(board_size)
@@ -235,11 +235,15 @@ func new_level() -> void:
 	var piece_radii: Array[float] = []
 	for i in total:
 		piece_radii.append(hole_radii[i % hole_count] + outline_reach)
-	var hole_spots := _hole_row(hole_radii, hole_radii.max() * 2)
 	# Holes are drawn as big as a piece's outer edge, so the tray leaves room for that.
-	var tray_rect := _bounds(hole_spots, hole_radii).grow(outline_reach + TRAY_PADDING)
+	var tray_margin := outline_reach + TRAY_PADDING
+	var hole_y: float = board_size.y - TRAY_INSET - tray_margin - hole_radii.max()
+	var hole_spots := _hole_row(hole_radii, hole_radii.max() * 2, hole_y)
+	var tray_rect := _bounds(hole_spots, hole_radii).grow(tray_margin)
 	_place_tray(tray_rect)
-	var piece_spots := _scatter_pieces(piece_radii, tray_rect)
+	# The tray sits along the bottom, and pieces only start above it, not beside it.
+	var below_tray := Rect2(0, tray_rect.position.y, board_size.x, board_size.y - tray_rect.position.y)
+	var piece_spots := _scatter_pieces(piece_radii, below_tray)
 
 	for i in hole_count:
 		var hole := ShapeView.new()
@@ -413,7 +417,7 @@ func place(p: ShapeView) -> void:
 	p.vanish_into(p.target_hole.norm_pos)
 	play_chime()
 	if _counts(p):
-		pips.add_one()
+		star_bar.add_one()
 	# The hole pulses with a sparkle as the piece arrives.
 	var hole := p.target_hole
 	get_tree().create_timer(0.2).timeout.connect(func():
@@ -431,8 +435,6 @@ func place(p: ShapeView) -> void:
 	if _left_to_clear <= 0:
 		if not tutorial:
 			score += 1
-			score_label.text = str(score)
-			score_star.bounce()
 		end_level(true)
 
 

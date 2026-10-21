@@ -7,8 +7,7 @@
 [ext_resource type="AudioStream" uid="uid://baeehieot3i2d" path="res://sounds/chime.mp3" id="5_chime"]
 [ext_resource type="Script" uid="uid://dhh6gk80oqxcv" path="res://scripts/dots.gd" id="6_dots"]
 [ext_resource type="Script" uid="uid://ck28mptikwo1r" path="res://scripts/toy_button.gd" id="7_toy_button"]
-[ext_resource type="Script" uid="uid://bqjdmps8ymcyf" path="res://scripts/progress_pips.gd" id="8_pips"]
-[ext_resource type="Script" uid="uid://bbdwp6n1qnx" path="res://scripts/star_badge.gd" id="9_star"]
+[ext_resource type="Script" uid="uid://eokuy767jq5f" path="res://scripts/star_bar.gd" id="8_stars"]
 [ext_resource type="Script" uid="uid://00jnqgabn85w" path="res://scripts/effects.gd" id="10_effects"]
 [ext_resource type="AudioStream" uid="uid://clkiv064ygbq2" path="res://sounds/pop.wav" id="11_pop"]
 [ext_resource type="AudioStream" uid="uid://hvlt77h46w57" path="res://sounds/boing.wav" id="12_boing"]
@@ -72,45 +71,13 @@ offset_left = 24.0
 offset_top = 16.0
 offset_right = 664.0
 offset_bottom = 800.0
-theme_override_constants/separation = 12
+theme_override_constants/separation = 20
 
-[node name="Header" type="HBoxContainer" parent="Content" unique_id=1993112631]
-custom_minimum_size = Vector2(0, 72)
-layout_mode = 2
-theme_override_constants/separation = 16
-
-[node name="Home" type="Button" parent="Content/Header" unique_id=1003299045]
-custom_minimum_size = Vector2(72, 72)
-layout_mode = 2
-script = ExtResource("7_toy_button")
-picture = "house"
-color = Color(1, 0.705882, 0.635294, 1)
-
-[node name="Pips" type="Control" parent="Content/Header" unique_id=84079687]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_filter = 2
-script = ExtResource("8_pips")
-
-[node name="ScoreStar" type="Control" parent="Content/Header" unique_id=1624370230]
-custom_minimum_size = Vector2(60, 72)
+[node name="StarBar" type="Control" parent="Content"]
+custom_minimum_size = Vector2(0, 64)
 layout_mode = 2
 mouse_filter = 2
-script = ExtResource("9_star")
-
-[node name="ScoreValue" type="Label" parent="Content/Header" unique_id=1827014603]
-custom_minimum_size = Vector2(56, 0)
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(1, 1, 1, 1)
-theme_override_constants/outline_size = 10
-theme_override_font_sizes/font_size = 44
-text = "0"
-vertical_alignment = 1
-
-[node name="TimerBar" type="Control" parent="Content" unique_id=945660209]
-custom_minimum_size = Vector2(0, 18)
-layout_mode = 2
-script = ExtResource("2_timer")
+script = ExtResource("8_stars")
 
 [node name="Board" type="Panel" parent="Content" unique_id=795404237]
 custom_minimum_size = Vector2(640, 640)
@@ -121,6 +88,25 @@ theme_override_styles/panel = SubResource("StyleBox_board")
 layout_mode = 1
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBox_tray")
+
+[node name="Footer" type="HBoxContainer" parent="Content"]
+custom_minimum_size = Vector2(0, 72)
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Home" type="Button" parent="Content/Footer" unique_id=1003299045]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+script = ExtResource("7_toy_button")
+picture = "house"
+color = Color(1, 0.705882, 0.635294, 1)
+
+[node name="TimerBar" type="Control" parent="Content/Footer" unique_id=945660209]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+script = ExtResource("2_timer")
 
 [node name="UhUh" type="AudioStreamPlayer" parent="." unique_id=1379607861]
 stream = ExtResource("4_uh_uh")
