@@ -25,7 +25,9 @@ const CHIP_COLORS := {"time": Color("fff0c2"), "plays": Color("e3f1ff"), "dots":
 const CHANNEL_NAMES := {"hue": "Hue", "saturation": "Saturation", "value": "Brightness"}
 const PART_NAMES := {"background": "Background dots", "shapes": "Shape dots"}
 const CHECK_EVERY := 0.25  # seconds between checks for unsaved changes
-const ABOUT_SEQUENCES := "The game plays these sequences from top to bottom. Each one plays its level the set number of times, then the next one starts. After the last, the game ends with a big star.\n\nA sequence set to play forever is the last one ever reached; any after it are shown faded."
+const EDGE_SCROLL := 90.0  # px from the list's top or bottom edge where a dragged card scrolls it
+const EDGE_SPEED := 700.0  # px/s it scrolls at, right at the edge
+const ABOUT_SEQUENCES := "The game plays these sequences from top to bottom. Each one plays its level the set number of times, then the next one starts. After the last, the game ends with a big star. Drag a card by the dots on its left to move it.\n\nA sequence set to play forever is the last one ever reached; any after it are shown faded."
 const ABOUT_TIME_BONUS := "In a timed level, each right match adds %d s (never past the level's full time), and each tap that lands on no piece, hole or button takes %d s away. Wrong drops cost nothing."
 const ABOUT_EXTRA := "Extra pieces on the board, in colors this sequence's color group's type of color blindness sees as well as anyone. A player who finds them but misses the group's own pieces is missing color, not attention.\n\nCounted: every piece must be placed to clear the level. Not counted: only the group's own pieces must be, and extras are optional."
 const ABOUT_DRAG := "Pieces can always be moved by tapping one, then its hole. Dragging lets them be carried there too. Turn it off for players who find dragging hard, so every move is two taps."
@@ -78,6 +80,7 @@ var _popup: PopupCard  # the open pop-up, or null
 var _clean := ""  # the settings as last loaded or saved, see _state
 var _dirty := false
 var _check_in := 0.0
+var _reorder := {}  # {row, pointer} while a sequence card is being dragged to a new place
 
 
 func _ready() -> void:
@@ -238,7 +241,7 @@ func _intro(parent: Control, line: String, title := "", about := "") -> void:
 # ---------- Levels ----------
 
 func _build_levels_page() -> void:
-	_intro(levels_page, "The game plays these from top to bottom. Tap Edit to change one.", "How sequences play", ABOUT_SEQUENCES)
+	_intro(levels_page, "The game plays these from top to bottom. Drag a card by its dots to move it, or tap Edit to change it.", "How sequences play", ABOUT_SEQUENCES)
 	_build_tutorial_card()
 	_level_list.add_theme_constant_override("separation", 14)
 	levels_page.add_child(_level_list)
@@ -298,6 +301,8 @@ func _add_row(entry: Dictionary) -> Dictionary:
 	var layout := HBoxContainer.new()
 	layout.add_theme_constant_override("separation", 20)
 	card.add_child(layout)
+	var grip := Grip.new()
+	layout.add_child(grip)
 	var badge := _badge("")
 	layout.add_child(badge)
 	var picture := LevelPicture.new()
@@ -339,6 +344,7 @@ func _add_row(entry: Dictionary) -> Dictionary:
 		"extra_scored": _switch("Counted", entry.extra_scored),
 	}
 	edit.pressed.connect(_open_editor.bind(row))
+	grip.gui_input.connect(_on_grip_input.bind(row))
 	row.colors.set_meta("choice", entry.colors)
 	row.colors.custom_minimum_size = Vector2(300, 52)
 	row.colors.add_theme_font_size_override("font_size", 20)
@@ -408,6 +414,89 @@ func _build_editor(row: Dictionary) -> VBoxContainer:
 			c.size_flags_vertical = Control.SIZE_SHRINK_END
 		editor.add_child(controls)
 	return editor
+
+
+# ---------- Reordering ----------
+
+## A press on a card's grip picks the card up; it follows the pointer from
+## slot to slot until let go. The grip keeps getting the pointer's moves
+## while held, wherever it goes.
+func _on_grip_input(event: InputEvent, row: Dictionary) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed and _reorder.is_empty():
+			_reorder = {"row": row, "pointer": event.global_position}
+			_lift(row.card, true)
+		elif not event.pressed and _reorder.get("row") == row:
+			_lift(row.card, false)
+			_reorder = {}
+	elif event is InputEventMouseMotion and _reorder.get("row") == row:
+		_reorder.pointer = event.global_position
+		_follow_pointer()
+
+
+## Moves the held card to the slot under the pointer: past every card whose
+## middle the pointer is below.
+func _follow_pointer() -> void:
+	var row: Dictionary = _reorder.row
+	var slot := 0
+	for other in _rows:
+		if other != row and _reorder.pointer.y > other.card.get_global_rect().get_center().y:
+			slot += 1
+	if slot == _rows.find(row):
+		return
+	_rows.erase(row)
+	_rows.insert(slot, row)
+	_level_list.move_child(row.card, slot)
+	_refresh_rows()
+	_play_tick()
+
+
+## A held card swells a little, with a bold outline and a deeper shadow, and
+## settles back when let go.
+func _lift(card: PanelContainer, up: bool) -> void:
+	if up:
+		var style := (card.get_theme_stylebox("panel") as StyleBoxFlat).duplicate()
+		style.bg_color = Color("fffaf0")
+		style.set_border_width_all(3)
+		style.border_color = Icons.INK
+		style.shadow_size = 14
+		style.shadow_offset = Vector2(0, 8)
+		style.shadow_color = Color(Icons.INK, 0.25)
+		card.add_theme_stylebox_override("panel", style)
+		card.z_index = 1
+		_play_tick()
+	else:
+		card.remove_theme_stylebox_override("panel")
+		card.z_index = 0
+	card.pivot_offset = card.size / 2
+	card.create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT).tween_property(card, "scale", Vector2.ONE * (1.03 if up else 1.0), 0.15)
+
+
+## The soft pop of the toy buttons, as a card is picked up or passes another.
+func _play_tick() -> void:
+	var tick := AudioStreamPlayer.new()
+	tick.stream = ToyButton.POP
+	tick.pitch_scale = randf_range(1.1, 1.3)
+	tick.volume_db = -6.0
+	tick.finished.connect(tick.queue_free)
+	add_child(tick)
+	tick.play()
+
+
+## Scrolls the list while a held card is near its top or bottom edge,
+## faster the closer it gets, so a card can be carried past what fits.
+func _edge_scroll(delta: float) -> void:
+	var scroll := tabs.get_current_tab_control() as ScrollContainer
+	var rect := scroll.get_global_rect()
+	var y: float = _reorder.pointer.y
+	var push := 0.0
+	if y < rect.position.y + EDGE_SCROLL:
+		push = -(1.0 - (y - rect.position.y) / EDGE_SCROLL)
+	elif y > rect.end.y - EDGE_SCROLL:
+		push = 1.0 - (rect.end.y - y) / EDGE_SCROLL
+	if push != 0.0:
+		scroll.scroll_vertical += int(EDGE_SPEED * clampf(push, -1.0, 1.0) * delta)
+		_follow_pointer()
 
 
 ## Opens row's editor in a pop-up; closing it keeps the editor for next time.
@@ -1032,8 +1121,11 @@ func _state() -> String:
 			ColorVision.mode, ColorVision.severity, PlaySettings.drag, PlaySettings.tutorial])
 
 
-## Shows "Unsaved changes" by Save while there are any.
+## Shows "Unsaved changes" by Save while there are any, and carries a held
+## card along the list's edges.
 func _process(delta: float) -> void:
+	if not _reorder.is_empty():
+		_edge_scroll(delta)
 	_check_in -= delta
 	if _check_in > 0:
 		return
@@ -1091,3 +1183,25 @@ func _save() -> bool:
 		_saved_tween.tween_interval(1.5)
 		_saved_tween.tween_property(saved_note, "modulate:a", 0.0, 0.4)
 	return not failed
+
+
+## The handle on a sequence card's left: two columns of dots, to press and
+## drag the card up or down the list (see _on_grip_input).
+class Grip extends Control:
+	func _init() -> void:
+		custom_minimum_size = Vector2(34, 84)
+		size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		mouse_default_cursor_shape = Control.CURSOR_MOVE
+		tooltip_text = "Drag to change the order"
+		add_to_group(DragScroll.HANDLES)
+		mouse_entered.connect(queue_redraw)
+		mouse_exited.connect(queue_redraw)
+
+	func _draw() -> void:
+		var pill := StyleBoxFlat.new()
+		pill.set_corner_radius_all(12)
+		pill.bg_color = Color(Icons.INK, 0.1 if get_global_rect().has_point(get_global_mouse_position()) else 0.04)
+		draw_style_box(pill, Rect2(Vector2.ZERO, size))
+		for col in 2:
+			for line in 3:
+				draw_circle(size / 2 + Vector2((col - 0.5) * 11, (line - 1) * 14), 3.5, Color(Icons.INK, 0.6))

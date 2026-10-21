@@ -19,6 +19,10 @@ extends Node
 ## like a phone's own lists. A press while it glides only stops it, and is
 ## not a tap on what happens to be under the finger.
 ##
+## Controls in the HANDLES group get their presses straight away, never held
+## back: they drag things around themselves, such as the grips that reorder
+## the level sequences.
+##
 ## The mouse wheel scrolls too, wherever the pointer is on the scroll; it never
 ## reaches the controls, so turning it over a slider does not change the slider.
 
@@ -28,6 +32,8 @@ const FRICTION := 4.0      # how fast a glide slows, per second; higher stops so
 const MIN_GLIDE := 60.0    # px/s; slower than this, a let-go just stops
 const STOP_GLIDE := 300.0  # px/s; a press on a page gliding faster only stops it
 const VELOCITY_RATE := 20.0  # how fast the swipe speed follows the finger, per second
+
+const HANDLES := "drag_scroll_handles"  # group of controls that do their own dragging
 
 enum {DECIDING, SCROLLING, PASSING}
 
@@ -58,7 +64,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			var scroll := _scroll_at(event.position)
-			if scroll and not scroll.get_v_scroll_bar().get_global_rect().has_point(event.position):
+			if scroll and not scroll.get_v_scroll_bar().get_global_rect().has_point(event.position) 					and not _handle_at(event.position):
 				var stopper := _glide == scroll and absf(_glide_speed) > STOP_GLIDE
 				_glide = null
 				_drag = {"scroll": scroll, "press": event, "start": event.position, "from": scroll.scroll_vertical,
@@ -133,6 +139,13 @@ func _scroll_at(pos: Vector2) -> ScrollContainer:
 func _slop() -> float:
 	var to_screen := get_viewport().get_final_transform().get_scale().x
 	return maxf(MIN_SLOP, DisplayServer.screen_get_dpi() * SLOP_INCHES / maxf(to_screen, 0.01))
+
+
+func _handle_at(pos: Vector2) -> bool:
+	for node in get_tree().get_nodes_in_group(HANDLES):
+		if node is Control and node.is_visible_in_tree() and node.get_global_rect().has_point(pos):
+			return true
+	return false
 
 
 func _slider_at(scroll: ScrollContainer, pos: Vector2) -> Slider:
