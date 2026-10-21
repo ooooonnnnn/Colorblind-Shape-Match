@@ -12,8 +12,11 @@ const GLOW_STRENGTH := 0.4  # opacity right at the outline
 const GLOW_BANDS := 24
 const FLIGHT := 0.65  # seconds for a cheering star to fly in from its start (see cheer)
 const SWING := 0.35   # how far the flight path bows out to the side, as a fraction of its length
+const STREAM_ARRIVE := 0.35  # seconds before the first streaming stars reach their target
+const STREAM_SPREAD := 0.15  # seconds over which the rest of them leave, so they arrive in a run
 
-## Each: {pos, vel, spin, angle, size, color, life, age, star, falls}
+## Each: {pos, vel, spin, angle, size, color, life, age, star, falls}, and for
+## streaming stars also {path: [start, control, end], delay}
 var _particles: Array[Dictionary] = []
 var _canvas := Node2D.new()
 var _star_node: Node2D
@@ -67,6 +70,24 @@ static func draw_star(canvas: CanvasItem, center: Vector2, side: float, color: C
 	for eye in [-1, 1]:
 		canvas.draw_circle(center + Vector2(eye * side * 0.08, -side * 0.02), side * 0.03, Icons.INK)
 	canvas.draw_arc(center + Vector2(0, side * 0.04), side * 0.07, 0.2, PI - 0.2, 16, Icons.INK, side * 0.025, true)
+
+
+## A run of small stars popping out of from and swooping into to, picking up
+## speed as they go, as if pulled in. The first arrive after STREAM_ARRIVE
+## seconds and the last STREAM_SPREAD later. spread is about the size of what
+## they come out of.
+func stream_stars(from: Vector2, to: Vector2, spread: float, count := 20) -> void:
+	for i in count:
+		var start := from + Vector2.from_angle(randf() * TAU) * spread * randf_range(0.1, 0.5)
+		# Each first bursts outward a little, so the run fans out before it converges.
+		var control := start + Vector2.from_angle(randf() * TAU) * spread * randf_range(0.8, 1.6) + (to - start) * 0.3
+		var delay := STREAM_SPREAD * i / count
+		_particles.append({
+			"pos": start, "vel": Vector2.ZERO, "path": [start, control, to], "delay": delay,
+			"spin": randf_range(-10, 10), "angle": randf() * TAU,
+			"size": randf_range(12.0, 22.0), "color": [Color("ffd166"), Color("ffe08a"), Color.WHITE].pick_random(),
+			"life": delay + randf_range(STREAM_ARRIVE, STREAM_ARRIVE + 0.08), "age": 0.0, "star": true, "falls": false,
+		})
 
 
 ## A big star that springs into view at center. Given from, the spot of a
@@ -150,7 +171,12 @@ func _process(delta: float) -> void:
 		return
 	for p in _particles:
 		p.age += delta
-		if p.falls:
+		if p.has("path"):
+			var t := clampf((p.age - p.delay) / (p.life - p.delay), 0.0, 1.0)
+			t = t * t  # speeds up as it nears the target
+			var a: Vector2 = p.path[0].lerp(p.path[1], t)
+			p.pos = a.lerp(p.path[1].lerp(p.path[2], t), t)
+		elif p.falls:
 			p.vel.y += GRAVITY * delta
 			p.vel.x *= 1.0 - 1.5 * delta  # air drag, so pieces flutter rather than fly
 			p.vel.y = minf(p.vel.y, 260.0)
@@ -174,11 +200,22 @@ func _draw_particles() -> void:
 				_canvas.draw_polyline(loop, Color(GLOW_COLOR, GLOW_STRENGTH * exp(-5.0 * f * f)), band * px + 0.5, true)
 	for p in _particles:
 		var fade := clampf((p.life - p.age) / 0.3, 0.0, 1.0)
+		var grow := 1.0
+		if p.has("path"):
+			# Streaming stars stay bright, popping in as they leave and shrinking as they land.
+			fade = 1.0
+			var t := clampf((p.age - p.delay) / (p.life - p.delay), 0.0, 1.0)
+			grow = minf(t * 6.0, 1.0) * lerpf(1.0, 0.5, t)
 		var color: Color = p.color
 		color.a = fade
-		_canvas.draw_set_transform(p.pos, p.angle, Vector2.ONE)
+		_canvas.draw_set_transform(p.pos, p.angle, Vector2.ONE * grow)
 		if p.star:
-			_canvas.draw_colored_polygon(Icons.star(p.size, p.size * 0.45), color)
+			var star := Icons.star(p.size, p.size * 0.45)
+			_canvas.draw_colored_polygon(star, color)
+			if p.has("path"):
+				# An outline, so they show up over the dots.
+				star.append(star[0])
+				_canvas.draw_polyline(star, Icons.INK, 2.0, true)
 		elif p.falls:
 			_canvas.draw_rect(Rect2(-p.size / 2, -p.size / 4, p.size, p.size / 2), color)
 		else:

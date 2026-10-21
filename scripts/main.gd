@@ -347,8 +347,8 @@ func end_level(cleared: bool) -> void:
 		_tutorial_pending = false
 	var delay := 0.8
 	if cleared:
-		# The meter filling, the star's flight, its landing and a moment to enjoy it.
-		delay = StarBar.FILL_TIME + Effects.FLIGHT + 1.1
+		# The stars and meter filling, the star's flight, its landing and a moment to enjoy it.
+		delay = Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + 1.1
 		_cheer()
 	else:
 		whoosh.play()
@@ -360,11 +360,11 @@ func end_level(cleared: bool) -> void:
 	)
 
 
-## Once the meter has filled, its star flies off with a whoosh, swinging into
+## Once the stars have reached the meter and filled it, its star flies off with a whoosh, swinging into
 ## the middle of the board as it grows; confetti and the fanfare greet it there.
 ## Timers call methods, not lambdas, so leaving for the menu mid-cheer drops them.
 func _cheer() -> void:
-	get_tree().create_timer(StarBar.FILL_TIME).timeout.connect(_launch_star.bind(_level_id))
+	get_tree().create_timer(Effects.STREAM_ARRIVE + StarBar.FILL_TIME).timeout.connect(_launch_star.bind(_level_id))
 
 
 func _launch_star(id: int) -> void:
@@ -440,7 +440,7 @@ func place(p: ShapeView) -> void:
 	p.vanish_into(p.target_hole.norm_pos)
 	play_chime()
 	if _counts(p):
-		star_bar.add_one()
+		_send_stars(p)
 	# The hole pulses with a sparkle as the piece arrives.
 	var hole := p.target_hole
 	get_tree().create_timer(0.2).timeout.connect(func():
@@ -459,6 +459,16 @@ func place(p: ShapeView) -> void:
 		if not tutorial:
 			score += 1
 		end_level(true)
+
+
+## Stars stream from p up to the meter, which fills a step as they arrive, with
+## a sparkle where they land.
+func _send_stars(p: ShapeView) -> void:
+	var rect := p.get_global_rect()
+	var to := star_bar.next_spot()
+	effects.stream_stars(rect.get_center(), to, rect.size.x * 0.5)
+	star_bar.add_one(Effects.STREAM_ARRIVE)
+	get_tree().create_timer(Effects.STREAM_ARRIVE).timeout.connect(effects.burst.bind(to, 14.0))
 
 
 ## Whether placing p counts toward clearing the level: every piece but extra
