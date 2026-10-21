@@ -84,6 +84,15 @@ files are packed at all.
   board is laid out (only level changes were fixed).
 - The tutorial plays every game, not only the first.
 
+## Screen sizes
+
+The design size is 1080x1080 with `stretch/aspect="expand"`, so the shorter
+side is always 1080 units and the longer one grows: 2400x1080 on a wide phone,
+1440x1080 on a tablet, 1080x1542 upright. Settings and stats switch to a
+stacked or compact layout below 1300 units wide, pop-ups keep at least 720,
+and the game shrinks a level's shapes (`ShapeView.fit_scale`) when its row of
+holes would not fit across the board.
+
 ## Building and checking
 
 - Godot: `C:/Users/talor/Downloads/Godot_v4.7.2-stable_win64.exe/Godot_v4.7.2-stable_win64_console.exe`

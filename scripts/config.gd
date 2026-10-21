@@ -24,6 +24,7 @@ const UNSAVED := Color("c46a00")  # a dark orange that reads on the page's blue
 const CHIP_COLORS := {"time": Color("fff0c2"), "plays": Color("e3f1ff"), "dots": Color("dff5e5"), "colors": Color("f3e6ff"), "extra": Color("ffe4dc")}
 const CHANNEL_NAMES := {"hue": "Hue", "saturation": "Saturation", "value": "Brightness"}
 const PART_NAMES := {"background": "Background dots", "shapes": "Shape dots"}
+const NARROW := 1300.0  # px; a page narrower than this puts the preview under the tabs
 const CHECK_EVERY := 0.25  # seconds between checks for unsaved changes
 const EDGE_SCROLL := 90.0  # px from the list's top or bottom edge where a dragged card scrolls it
 const EDGE_SPEED := 700.0  # px/s it scrolls at, right at the edge
@@ -51,6 +52,7 @@ const ABOUT_VISION := "Shows the whole page as someone with that type of color b
 @onready var preview: Panel = %Preview
 @onready var tray: Panel = %Tray
 @onready var dots: Dots = $Dots
+@onready var columns: BoxContainer = $Margin/Page/Columns
 
 var _rows: Array[Dictionary] = []  # each level sequence's card, editor and controls, by field
 var _level_list := VBoxContainer.new()
@@ -106,6 +108,8 @@ func _ready() -> void:
 	_build_vision_controls()
 	back.activated.connect(_on_back)
 	save.pressed.connect(_save)
+	resized.connect(_fit_columns)
+	_fit_columns()
 	_clean = _state()
 
 
@@ -1113,6 +1117,16 @@ func _layout_preview() -> void:
 
 
 # ---------- Saving and leaving ----------
+
+## Side by side on a wide screen; on a narrow one, as an upright phone or
+## window, the preview goes under the tabs, which take the room left.
+func _fit_columns() -> void:
+	var narrow := size.x < NARROW
+	columns.vertical = narrow
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	preview.get_parent().custom_minimum_size.y = 560.0 if narrow else 0.0
+	preview.get_parent().size_flags_vertical = Control.SIZE_FILL if narrow else Control.SIZE_EXPAND_FILL
+
 
 ## Everything Save writes, as text, to tell whether anything changed since.
 func _state() -> String:

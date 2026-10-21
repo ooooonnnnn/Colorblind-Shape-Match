@@ -15,6 +15,7 @@ const DANGER := Color("ffb4a2")
 ## Above the dot filter (100) and effects (101), which would otherwise cover
 ## it, and below ColorVision (128), so color blind mode shows on it too.
 const LAYER := 110
+const MIN_WIDTH := 720.0  # px; narrower screens give the window this much, or nearly all they have
 const THEME := preload("res://ui_theme.tres")  # a CanvasLayer cuts it off from the page's own
 
 var body := VBoxContainer.new()
@@ -23,6 +24,7 @@ var _window := PanelContainer.new()
 var _scroll := ScrollContainer.new()
 var _title := Label.new()
 var _closed := false
+var _width := 0.6  # the window's share of the screen's width, at least MIN_WIDTH
 
 
 ## Opens a window with a title over the whole screen, width as a fraction of
@@ -30,8 +32,7 @@ var _closed := false
 static func open(parent: Node, title: String, width := 0.6) -> PopupCard:
 	var popup := PopupCard.new()
 	popup._title.text = title
-	popup._window.anchor_left = (1.0 - width) / 2
-	popup._window.anchor_right = 1.0 - (1.0 - width) / 2
+	popup._width = width
 	var layer := CanvasLayer.new()
 	layer.layer = LAYER
 	parent.add_child(layer)
@@ -121,6 +122,8 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	resized.connect(_fit_width)
+	_fit_width()
 	# Short windows shrink to fit their contents, centered, rather than fill the
 	# page. Wrapped text knows its height only once it has its width, a frame in.
 	await get_tree().process_frame
@@ -142,6 +145,16 @@ func _ready() -> void:
 	var t := create_tween().set_parallel()
 	t.tween_property(self, "modulate:a", 1.0, OPEN_TIME * 0.6)
 	t.tween_property(_window, "scale", Vector2.ONE, OPEN_TIME).from(Vector2.ONE * 0.85).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Keeps the window at its share of the screen's width, but never narrower
+## than MIN_WIDTH, or 94% of a screen narrower than that.
+func _fit_width() -> void:
+	var share := _width
+	if size.x > 0:
+		share = clampf(maxf(_width, MIN_WIDTH / size.x), 0.0, 0.94)
+	_window.anchor_left = (1.0 - share) / 2
+	_window.anchor_right = 1.0 - (1.0 - share) / 2
 
 
 ## A paragraph in the body, in the readable size.

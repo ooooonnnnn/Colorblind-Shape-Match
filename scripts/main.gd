@@ -196,6 +196,24 @@ func _free_spot(spots: Array[Vector2], radii: Array[float], keep_out: Rect2) -> 
 	return Vector2.INF
 
 
+## Shrinks the level's shapes (ShapeView.fit_scale) until the row of holes,
+## with its tray, fits across the board with the pieces' edge gap to spare.
+## The row's gaps include fixed pixels, so it takes a few rounds to settle.
+func _fit_holes(shapes: Array) -> void:
+	ShapeView.fit_scale = 1.0
+	var room := board_size.x - 2 * EDGE_GAP
+	for _round in 4:
+		var side := ShapeView.side_for(board_size)
+		var radii: Array[float] = []
+		for shape in shapes:
+			radii.append(Shapes.radius(shape.points) * side)
+		var spots := _hole_row(radii, radii.max() * 2, 0.0)
+		var width := _bounds(spots, radii).grow(side * ShapeView.outline_percent / 200 + TRAY_PADDING).size.x
+		if width <= room:
+			return
+		ShapeView.fit_scale *= room / width * 0.98
+
+
 ## Positions the tray behind the holes, anchored so it follows board resizes.
 func _place_tray(rect: Rect2) -> void:
 	tray.anchor_left = rect.position.x / board_size.x
@@ -250,6 +268,7 @@ func new_level() -> void:
 	star_bar.total = _left_to_clear
 
 	var shapes := Shapes.pick(hole_count)
+	_fit_holes(shapes)
 	var side := ShapeView.side_for(board_size)
 	var hole_radii: Array[float] = []
 	for shape in shapes:

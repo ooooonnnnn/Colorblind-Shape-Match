@@ -22,6 +22,7 @@ const MUTED := Color(0.231373, 0.184314, 0.290196, 0.78)  # Icons.INK, for capti
 const TRACK := Color(0.231373, 0.184314, 0.290196, 0.12)  # empty part of a chart
 const BASELINE_PLATE := {"background": Color("c9ccd3"), "colors": [Color("3b2f4a")]}  # the shapes in plain sight
 const EXTRA_PLATE := {"background": Color("559c68"), "colors": [Color("6693ab"), Color("4d9f37")]}  # off the confusion lines
+const NARROW := 1300.0  # px; a page narrower than this gets compact cards
 const ABOUT_VERDICTS := "Each color group is made for one type of color blindness: its pieces blend into the dots for that type.\n\nLooks fine: the pieces were found, at the player's usual speed.\nWorth watching: some were found late, slowly, or missed more than elsewhere.\nMissed a lot: many were missed or found late, which on printed plates fails the screen for this type.\n\nA piece is late when it took several times longer than this player usually needs, so it was most likely not seen at first."
 const ABOUT_CHECKS := "Extra shapes are pieces every type of color vision can see, shown in the same filtered levels. No filter is levels played without the dots.\n\nIf the player does well on these, the task itself is easy for them, so misses in a color group point to color. If they struggle here too, attention or the game may be the reason instead."
 const ABOUT_DISCLAIMER := "Screens can't show calibrated test colors, and a diagnosis needs printed plates under daylight (D65) lighting, checked by a professional. Treat a flagged group as a reason to see an eye care professional, not as a result."
@@ -35,6 +36,7 @@ const ABOUT_DISCLAIMER := "Screens can't show calibrated test colors, and a diag
 @onready var disclaimer: Label = $Margin/Rows/Disclaimer
 
 var _details: PopupCard  # the open details pop-up, or null
+var _narrow := false  # the cards are built compact, for a narrow page
 
 
 func _ready() -> void:
@@ -57,7 +59,23 @@ func _ready() -> void:
 	disclaimer.autowrap_mode = TextServer.AUTOWRAP_OFF
 	disclaimer.text = "A game, not a diagnosis: a flagged group is a reason to see an eye care professional."
 	footer.add_child(InfoButton.new("A game, not a diagnosis", ABOUT_DISCLAIMER))
+	summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_narrow = size.x < NARROW
+	if _narrow:
+		_compact_header()
+	resized.connect(func():
+		if (size.x < NARROW) != _narrow:
+			_narrow = size.x < NARROW
+			_compact_header()
+			_build()
+	)
 	_build()
+
+
+## Narrower Export and Clear buttons, so the header fits a narrow page.
+func _compact_header() -> void:
+	for b in [export_button, clear]:
+		b.custom_minimum_size.x = 170.0 if _narrow else 220.0
 
 
 ## Asks where to save all the records as an Excel workbook, one sheet per
@@ -157,11 +175,11 @@ func _add_card(summary: Dictionary, id: String, title: String, subtitle: String,
 
 	var card := PanelContainer.new()
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 24)
+	row.add_theme_constant_override("separation", 14 if _narrow else 24)
 	card.add_child(row)
 
 	var plate: Control = GroupPlate.new()
-	plate.custom_minimum_size = Vector2(124, 124)
+	plate.custom_minimum_size = Vector2.ONE * (84 if _narrow else 124)
 	plate.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	plate.background = plate_colors.background
 	plate.colors = plate_colors.colors
@@ -185,13 +203,13 @@ func _add_card(summary: Dictionary, id: String, title: String, subtitle: String,
 	middle.add_child(_wrapped(reading.lines[0], Icons.INK, 21))
 
 	var numbers := HBoxContainer.new()
-	numbers.add_theme_constant_override("separation", 36)
+	numbers.add_theme_constant_override("separation", 18 if _narrow else 36)
 	var outcome := VBoxContainer.new()
 	outcome.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	outcome.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	outcome.add_theme_constant_override("separation", 6)
 	var bar := OutcomeBar.new()
-	bar.custom_minimum_size = Vector2(220, 22)
+	bar.custom_minimum_size = Vector2(140 if _narrow else 220, 22)
 	bar.mouse_filter = Control.MOUSE_FILTER_PASS
 	bar.counts = [g.found - g.late, g.late, g.seen, g.missed]
 	outcome.add_child(bar)
@@ -205,7 +223,7 @@ func _add_card(summary: Dictionary, id: String, title: String, subtitle: String,
 
 	var more := Button.new()
 	more.text = "See details"
-	more.custom_minimum_size = Vector2(170, 56)
+	more.custom_minimum_size = Vector2(130 if _narrow else 170, 56)
 	more.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	more.add_theme_font_size_override("font_size", 20)
 	more.pressed.connect(_open_details.bind(summary, id, title, subtitle, plate_colors, names))
@@ -404,7 +422,7 @@ func _badge(level: String) -> PanelContainer:
 
 func _tile(value: String, caption: String, color: Color) -> VBoxContainer:
 	var tile := VBoxContainer.new()
-	tile.custom_minimum_size = Vector2(110, 0)
+	tile.custom_minimum_size = Vector2(90 if _narrow else 110, 0)
 	tile.add_theme_constant_override("separation", 0)
 	var big := Label.new()
 	big.text = value

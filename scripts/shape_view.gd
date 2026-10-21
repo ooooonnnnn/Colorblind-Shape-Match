@@ -19,6 +19,9 @@ static var side_fraction := 0.2  # width as a fraction of the board's shorter si
 ## hollow so they are harder to spot in the dot filter; bolder is easier, and
 ## much thinner the line slips between dot centers, where the filter samples.
 static var outline_percent := 26.0
+## Shrinks shapes below side_fraction for a level whose row of holes would
+## not fit across the board otherwise, as on an upright phone (see main.gd).
+static var fit_scale := 1.0
 
 var is_piece := false
 var shape_name := ""
@@ -116,6 +119,7 @@ func _breathe() -> void:
 
 ## Reads side_fraction and outline_percent from CONFIG_PATH.
 static func load_size() -> void:
+	fit_scale = 1.0
 	var data = JSON.parse_string(FileAccess.get_file_as_string(SettingsFile.read_path(CONFIG_PATH)))
 	if not data is Dictionary:
 		push_error("Bad or missing shape size in %s" % CONFIG_PATH)
@@ -144,7 +148,7 @@ func _has_point(point: Vector2) -> bool:
 
 ## Side length in pixels of a piece or hole on a board of this size.
 static func side_for(board_size: Vector2) -> float:
-	return minf(board_size.x, board_size.y) * side_fraction
+	return minf(board_size.x, board_size.y) * side_fraction * fit_scale
 
 
 func _update_layout() -> void:

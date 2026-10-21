@@ -153,7 +153,7 @@ theme_override_styles/hover = SubResource("StyleBox_save_hover")
 theme_override_styles/pressed = SubResource("StyleBox_save")
 text = "Save changes"
 
-[node name="Columns" type="HBoxContainer" parent="Margin/Page"]
+[node name="Columns" type="BoxContainer" parent="Margin/Page"]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 32
