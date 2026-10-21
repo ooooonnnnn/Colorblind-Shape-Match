@@ -10,6 +10,8 @@ const GLOW_REACH := 24.0  # how far the glow fades out past a piece's outline, i
 const GLOW_COLOR := Color(1.0, 0.93, 0.62)  # warm golden white, bright on the blue-gray board and the dots
 const GLOW_STRENGTH := 0.4  # opacity right at the outline
 const GLOW_BANDS := 24
+const FLIGHT := 0.65  # seconds for a cheering star to fly in from its start (see cheer)
+const SWING := 0.35   # how far the flight path bows out to the side, as a fraction of its length
 
 ## Each: {pos, vel, spin, angle, size, color, life, age, star, falls}
 var _particles: Array[Dictionary] = []
@@ -51,28 +53,41 @@ func confetti(rect: Rect2, count := 70) -> void:
 		})
 
 
-## A big star that springs into view at center. Unless stay is set it shrinks
-## away after hold seconds; with stay it bobs gently until clear() is called.
-func cheer(center: Vector2, side: float, hold := 1.0, stay := false) -> void:
+## A star of the given side centered on center, with a happy face if face.
+static func draw_star(canvas: CanvasItem, center: Vector2, side: float, color: Color, face := true) -> void:
+	var points := Icons.star(side / 2, side * 0.24)
+	for i in points.size():
+		points[i] += center
+	canvas.draw_colored_polygon(points, color)
+	points.append(points[0])
+	canvas.draw_polyline(points, Icons.INK, maxf(2.0, side * 0.035), true)
+	if not face:
+		return
+	# Two friendly eyes and a smile, so the star reads as a happy face.
+	for eye in [-1, 1]:
+		canvas.draw_circle(center + Vector2(eye * side * 0.08, -side * 0.02), side * 0.03, Icons.INK)
+	canvas.draw_arc(center + Vector2(0, side * 0.04), side * 0.07, 0.2, PI - 0.2, 16, Icons.INK, side * 0.025, true)
+
+
+## A big star that springs into view at center. Given from, the spot of a
+## smaller star elsewhere on screen (see StarBar.star_spot), it flies from there
+## instead, swinging out along a curve and spinning as it grows, and lands
+## FLIGHT seconds later. Unless stay is set it shrinks away after hold seconds;
+## with stay it bobs gently until clear() is called.
+func cheer(center: Vector2, side: float, hold := 1.0, stay := false, from := Rect2()) -> void:
 	clear_star()
 	_star_node = Node2D.new()
 	_star_node.position = center
 	_star_node.scale = Vector2.ZERO
 	_star_node.rotation = -0.4
-	_star_node.draw.connect(func():
-		var points := Icons.star(side / 2, side * 0.24)
-		_star_node.draw_colored_polygon(points, Color("ffd166"))
-		points.append(points[0])
-		_star_node.draw_polyline(points, Icons.INK, side * 0.035, true)
-		# Two friendly eyes and a smile, so the star reads as a happy face.
-		for eye in [-1, 1]:
-			_star_node.draw_circle(Vector2(eye * side * 0.08, -side * 0.02), side * 0.03, Icons.INK)
-		_star_node.draw_arc(Vector2(0, side * 0.04), side * 0.07, 0.2, PI - 0.2, 16, Icons.INK, side * 0.025, true)
-	)
+	_star_node.draw.connect(func(): draw_star(_star_node, Vector2.ZERO, side, Color("ffd166")))
 	add_child(_star_node)
-	# Untwist while it springs in; bound to the star so it dies with it.
-	_star_node.create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT).tween_property(_star_node, "rotation", 0.0, 0.32)
 	_star_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	if from.has_area():
+		_fly_in(from, center, side)
+	else:
+		# Untwist while it springs in; bound to the star so it dies with it.
+		_star_node.create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT).tween_property(_star_node, "rotation", 0.0, 0.32)
 	# Squash and stretch on the way in, then settle.
 	for s in [Vector2(1.3, 0.8), Vector2(0.9, 1.15), Vector2(1.05, 0.97), Vector2.ONE]:
 		_star_tween.tween_property(_star_node, "scale", s, 0.08)
@@ -86,6 +101,28 @@ func cheer(center: Vector2, side: float, hold := 1.0, stay := false) -> void:
 		_star_tween.tween_interval(hold)
 		_star_tween.tween_property(_star_node, "scale", Vector2.ZERO, 0.2).set_ease(Tween.EASE_IN)
 		_star_tween.tween_callback(clear_star)
+
+
+## Adds the flight from from to center to the start of _star_tween: a curve
+## bowing downward, like a swing dropping and sweeping up, while the star grows
+## to full size and spins a full turn, landing with the squash cheer adds after.
+func _fly_in(from: Rect2, center: Vector2, side: float) -> void:
+	var start := from.get_center()
+	var path := center - start
+	var bow := Vector2(-path.y, path.x).normalized() * path.length() * SWING
+	if bow.y < 0:
+		bow = -bow
+	var control := (start + center) / 2 + bow
+	var small := from.size.x / side
+	_star_node.position = start
+	_star_node.rotation = 0.0
+	_star_node.scale = Vector2.ONE * small
+	_star_tween.tween_method(func(t: float):
+		# A quadratic Bezier from start through control's pull to center.
+		_star_node.position = start.lerp(control, t).lerp(control.lerp(center, t), t)
+		_star_node.rotation = -TAU * t
+		_star_node.scale = Vector2.ONE * lerpf(small, 1.0, t)
+	, 0.0, 1.0, FLIGHT).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 
 
 ## A warm golden glow hugging a picked-up piece, so it is easy to keep track

@@ -324,8 +324,9 @@ func end_game() -> void:
 	home.start_pulse()
 
 
-## Cleared levels get a cheering star, confetti and a fanfare. When time runs
-## out there is no failure message: the pieces just float away with a whoosh.
+## Cleared levels get a cheering star, confetti and a fanfare (see _cheer).
+## When time runs out there is no failure message: the pieces just float away
+## with a whoosh.
 func end_level(cleared: bool) -> void:
 	transitioning = true
 	deselect()
@@ -346,11 +347,9 @@ func end_level(cleared: bool) -> void:
 		_tutorial_pending = false
 	var delay := 0.8
 	if cleared:
-		delay = 1.0
-		var rect := board.get_global_rect()
-		effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 0.4)
-		effects.confetti(rect)
-		fanfare.play()
+		# The meter filling, the star's flight, its landing and a moment to enjoy it.
+		delay = StarBar.FILL_TIME + Effects.FLIGHT + 1.1
+		_cheer()
 	else:
 		whoosh.play()
 	_float_away(pieces)  # anything left, as a cleared level may not need every piece
@@ -359,6 +358,30 @@ func end_level(cleared: bool) -> void:
 		if id == _level_id:
 			new_level()
 	)
+
+
+## Once the meter has filled, its star flies off with a whoosh, swinging into
+## the middle of the board as it grows; confetti and the fanfare greet it there.
+## Timers call methods, not lambdas, so leaving for the menu mid-cheer drops them.
+func _cheer() -> void:
+	get_tree().create_timer(StarBar.FILL_TIME).timeout.connect(_launch_star.bind(_level_id))
+
+
+func _launch_star(id: int) -> void:
+	if id != _level_id:
+		return
+	var rect := board.get_global_rect()
+	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 0.5, false, star_bar.star_spot())
+	star_bar.take_star()
+	whoosh.play()
+	get_tree().create_timer(Effects.FLIGHT).timeout.connect(_star_landed.bind(id))
+
+
+func _star_landed(id: int) -> void:
+	if id != _level_id:
+		return
+	effects.confetti(board.get_global_rect())
+	fanfare.play()
 
 
 ## Fades and shrinks views away, then frees them if free, for views no longer
