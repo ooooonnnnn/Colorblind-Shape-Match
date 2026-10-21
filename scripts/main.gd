@@ -24,7 +24,8 @@ const EDGE_GAP := 16.0       # px of full-size dots kept between a piece and the
 const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 ## The tutorial level played first when PlaySettings.tutorial is on: one piece
 ## in plain sight, in a dark color everyone can see, while a TutorialHand shows
-## how to move it. It has no level number and leaves no stats or score.
+## how to move it. It has no level number and leaves no stats, but its star
+## counts toward the run's stars like any other.
 const TUTORIAL_LEVEL := {"duration": 0.0, "holes": 1, "shapes": 1, "repetitions": 1, "filter": false, "colors": "random", "time_bonus": false, "extra": 0, "extra_scored": true}
 const TUTORIAL_COLOR := Icons.INK
 
@@ -460,12 +461,9 @@ func _launch_star(id: int) -> void:
 	if id != _level_id:
 		return
 	var rect := board.get_global_rect()
-	# The tutorial's star isn't counted, so it just shrinks away.
-	var to := Rect2() if tutorial else star_counter.star_spot()
-	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 0.35, false, star_bar.star_spot(), to)
-	if not tutorial:
-		# After the landing's squash (0.32 s) and the hold, the trip in.
-		get_tree().create_timer(Effects.FLIGHT + 0.32 + 0.35 + Effects.STORE).timeout.connect(_star_stored.bind(id))
+	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 0.35, false, star_bar.star_spot(), star_counter.star_spot())
+	# After the landing's squash (0.32 s) and the hold, the trip in.
+	get_tree().create_timer(Effects.FLIGHT + 0.32 + 0.35 + Effects.STORE).timeout.connect(_star_stored.bind(id))
 	star_bar.take_star()
 	whoosh.play()
 	get_tree().create_timer(Effects.FLIGHT).timeout.connect(_star_landed.bind(id))
