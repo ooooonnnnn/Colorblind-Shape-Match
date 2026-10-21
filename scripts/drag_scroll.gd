@@ -15,17 +15,30 @@ extends Node
 ## The slop is a physical distance, so a wobbly tap on a dense tablet screen
 ## still counts as a tap.
 ##
+## A swipe keeps the page gliding after the finger lifts, slowing to a stop,
+## like a phone's own lists. A press while it glides only stops it, and is
+## not a tap on what happens to be under the finger.
+##
 ## The mouse wheel scrolls too, wherever the pointer is on the scroll; it never
 ## reaches the controls, so turning it over a slider does not change the slider.
 
 const SLOP_INCHES := 0.1   # how far a tap may wander, about 2.5 mm
 const MIN_SLOP := 12.0     # px, so a mouse needs a deliberate drag too
+const FRICTION := 4.0      # how fast a glide slows, per second; higher stops sooner
+const MIN_GLIDE := 60.0    # px/s; slower than this, a let-go just stops
+const STOP_GLIDE := 300.0  # px/s; a press on a page gliding faster only stops it
+const VELOCITY_RATE := 20.0  # how fast the swipe speed follows the finger, per second
 
 enum {DECIDING, SCROLLING, PASSING}
 
 var target: Callable  ## returns the ScrollContainer to drag right now, or null
 
-var _drag := {}  # {scroll, press, start, from, slider, mode} from a press until it is let go
+var _drag := {}  # {scroll, press, start, from, slider, mode, stopper} from a press until it is let go
+var _velocity := 0.0  # px/s of the finger while scrolling, smoothed
+var _last_move_ms := 0
+var _glide: ScrollContainer  # the scroll still moving after a swipe, or null
+var _glide_speed := 0.0  # px/s, positive scrolls down the page
+var _glide_pos := 0.0  # exact scroll position, as scroll_vertical is whole pixels
 var _replaying := false  # true while held-back events are sent on, so _input lets them by
 
 
@@ -46,15 +59,25 @@ func _input(event: InputEvent) -> void:
 		if event.pressed:
 			var scroll := _scroll_at(event.position)
 			if scroll and not scroll.get_v_scroll_bar().get_global_rect().has_point(event.position):
+				var stopper := _glide == scroll and absf(_glide_speed) > STOP_GLIDE
+				_glide = null
 				_drag = {"scroll": scroll, "press": event, "start": event.position, "from": scroll.scroll_vertical,
-						"slider": _slider_at(scroll, event.position), "mode": DECIDING}
+						"slider": _slider_at(scroll, event.position), "mode": DECIDING, "stopper": stopper}
+				_velocity = 0.0
+				_last_move_ms = Time.get_ticks_msec()
 				get_viewport().set_input_as_handled()
 		elif not _drag.is_empty():
-			if _drag.mode == DECIDING:  # a tap
+			if _drag.mode == DECIDING:  # a tap, unless it only stopped a glide
 				get_viewport().set_input_as_handled()
-				_replay.call_deferred([_drag.press, event])
+				if not _drag.stopper:
+					_replay.call_deferred([_drag.press, event])
 			elif _drag.mode == SCROLLING:  # nothing below saw the press
 				get_viewport().set_input_as_handled()
+				# A finger that rested before letting go has no speed left to glide with.
+				if Time.get_ticks_msec() - _last_move_ms < 100 and absf(_velocity) > MIN_GLIDE:
+					_glide = _drag.scroll
+					_glide_speed = -_velocity
+					_glide_pos = _glide.scroll_vertical
 			_drag = {}
 	elif event is InputEventMouseMotion and not _drag.is_empty():
 		var moved: Vector2 = event.position - _drag.start
@@ -73,6 +96,29 @@ func _input(event: InputEvent) -> void:
 			SCROLLING:
 				get_viewport().set_input_as_handled()
 				_drag.scroll.scroll_vertical = int(_drag.from - moved.y)
+				var now := Time.get_ticks_msec()
+				var dt := maxf((now - _last_move_ms) / 1000.0, 0.001)
+				_velocity = lerpf(_velocity, event.relative.y / dt, 1.0 - exp(-VELOCITY_RATE * dt))
+				_last_move_ms = now
+	elif event is InputEventScreenDrag and not _drag.is_empty():
+		# The page is moved here; a ScrollContainer's own touch scrolling would move it twice.
+		get_viewport().set_input_as_handled()
+
+
+func _process(delta: float) -> void:
+	if not _glide:
+		return
+	if not is_instance_valid(_glide) or not _glide.is_visible_in_tree():
+		_glide = null
+		return
+	_glide_pos += _glide_speed * delta
+	var bar := _glide.get_v_scroll_bar()
+	_glide_pos = clampf(_glide_pos, bar.min_value, maxf(bar.min_value, bar.max_value - bar.page))
+	_glide.scroll_vertical = int(_glide_pos)
+	_glide_speed *= exp(-FRICTION * delta)
+	# Stop at the ends and once it has all but stopped.
+	if absf(_glide_speed) < 20.0 or _glide_pos <= bar.min_value or _glide_pos >= bar.max_value - bar.page:
+		_glide = null
 
 
 ## The scroll to work on, if pos is on it.
