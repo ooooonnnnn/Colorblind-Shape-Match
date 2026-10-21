@@ -3,6 +3,8 @@ extends Control
 const Dots := preload("res://scripts/dots.gd")
 const ColorGroups := preload("res://scripts/color_groups.gd")
 const Stats := preload("res://scripts/stats.gd")
+const GroupPlate := preload("res://scripts/group_plate.gd")
+const PLAIN_PLATE := {"background": Color("c9ccd3"), "colors": [Color("3b2f4a")]}  # shapes in plain sight, as on the stats screen
 const MIN_LOOK_MS := 10000   # how long a level must have been up before leaving it counts its pieces as missed
 const DRAG_THRESHOLD := 14.0  # px of movement before a press counts as a drag, so a shaky tap stays a tap
 const GLIDE_RATE := 22.0     # how fast a dragged piece catches up with the finger, per second; lower trails more
@@ -26,10 +28,12 @@ const TUTORIAL_LEVEL := {"duration": 0.0, "holes": 1, "shapes": 1, "repetitions"
 const TUTORIAL_COLOR := Icons.INK
 
 @onready var content: VBoxContainer = $Content
-@onready var home: ToyButton = $Content/Footer/Home
-@onready var star_bar: StarBar = $Content/StarBar
-@onready var timer_bar: TimerBar = $Content/Footer/TimerBar
+@onready var home: ToyButton = $Content/Header/Home
+@onready var star_bar: StarBar = $Content/Header/StarBar
+@onready var testing: PanelContainer = $Content/Header/Testing
+@onready var timer_bar: TimerBar = $Content/TimerBar
 @onready var board: Panel = $Content/Board
+@onready var glow: Backdrop = $Content/Board/Glow
 @onready var tray: Panel = $Content/Board/Tray
 @onready var uh_uh: AudioStreamPlayer = $UhUh
 @onready var chime: AudioStreamPlayer = $Chime
@@ -102,10 +106,10 @@ func _ready() -> void:
 
 
 func _layout() -> void:
-	# 16 px margins above and below, the 64 px star bar on top and the 72 px
-	# footer (Home and the timer) below, 20 px gaps that leave room for the
-	# board's frame, and 24 px margins at the sides.
-	board_size = Vector2(maxf(size.x - 48, 200), maxf(size.y - 208, 200))
+	# 16 px margins above and below, the 76 px header (Home, the star meter and
+	# what is being tested) on top and the 40 px timer below, 20 px gaps that
+	# leave room for the board's frame, and 24 px margins at the sides.
+	board_size = Vector2(maxf(size.x - 48, 200), maxf(size.y - 188, 200))
 	board.custom_minimum_size = board_size
 	content.position = Vector2(24, 16)
 	content.size = Vector2(board_size.x, 0)
@@ -231,6 +235,9 @@ func new_level() -> void:
 	level_time = config.duration
 	time_bonus = config.time_bonus
 	dots.visible = config.filter
+	# The soft sky only shows without the filter, which would read its colors.
+	glow.visible = not config.filter
+	_show_testing(group if config.filter and not tutorial else {}, tutorial)
 	dots.process_mode = Node.PROCESS_MODE_INHERIT if config.filter else Node.PROCESS_MODE_DISABLED
 	timer_bar.modulate.a = 1.0 if level_time > 0 else 0.0  # hidden, but keeps its place in the layout
 	star_bar.total = _left_to_clear
@@ -304,6 +311,60 @@ func new_level() -> void:
 	transitioning = false
 	_level_started_ms = Time.get_ticks_msec()
 	_search_from_ms = _level_started_ms
+
+
+## The badge at the top right: a little plate in the colors being tested and
+## which type of color blindness they check for, or that this level has no
+## dots. It pops when it changes.
+func _show_testing(group: Dictionary, practice: bool) -> void:
+	for child in testing.get_children():
+		child.queue_free()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(1, 1, 1, 0.85)
+	style.set_corner_radius_all(22)
+	style.set_border_width_all(3)
+	style.border_color = Icons.INK
+	style.shadow_color = Color(Icons.INK, 0.15)
+	style.shadow_offset = Vector2(0, 3)
+	style.content_margin_left = 10
+	style.content_margin_right = 20
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	testing.add_theme_stylebox_override("panel", style)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	testing.add_child(row)
+	var plate: Control = GroupPlate.new()
+	plate.custom_minimum_size = Vector2(52, 52)
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var colors: Dictionary = PLAIN_PLATE if group.is_empty() else {"background": group.background, "colors": group.colors}
+	plate.background = colors.background
+	plate.colors = colors.colors
+	row.add_child(plate)
+	var words := VBoxContainer.new()
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	words.add_theme_constant_override("separation", -2)
+	row.add_child(words)
+	var caption := Label.new()
+	caption.add_theme_font_size_override("font_size", 16)
+	caption.add_theme_color_override("font_color", Color(Icons.INK, 0.75))
+	var title := Label.new()
+	title.add_theme_font_size_override("font_size", 24)
+	if practice:
+		caption.text = "Practice"
+		title.text = "Tutorial"
+	elif group.is_empty():
+		caption.text = "No dots"
+		title.text = "Plain shapes"
+	else:
+		caption.text = "Checking for"
+		title.text = "%s · %s" % [group.name, str(group.kind).get_slice(" (", 0).to_lower()]
+	words.add_child(caption)
+	words.add_child(title)
+	testing.pivot_offset = testing.size / 2
+	var t := testing.create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(testing, "scale", Vector2.ONE, 0.3).from(Vector2.ONE * 0.8)
 
 
 func _stop_hand() -> void:

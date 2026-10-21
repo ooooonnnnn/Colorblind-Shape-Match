@@ -3,6 +3,7 @@
 [ext_resource type="Theme" uid="uid://b426jgoyfty6l" path="res://ui_theme.tres" id="0_theme"]
 [ext_resource type="Script" uid="uid://fsp2vy8ki40l" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://bv2qu221uye1x" path="res://scripts/timer_bar.gd" id="2_timer"]
+[ext_resource type="Script" uid="uid://d3kmfc4fs10uw" path="res://scripts/backdrop.gd" id="18_backdrop"]
 [ext_resource type="AudioStream" uid="uid://d31jia44rl45k" path="res://sounds/uh_uh.mp3" id="4_uh_uh"]
 [ext_resource type="AudioStream" uid="uid://baeehieot3i2d" path="res://sounds/chime.mp3" id="5_chime"]
 [ext_resource type="Script" uid="uid://dhh6gk80oqxcv" path="res://scripts/dots.gd" id="6_dots"]
@@ -40,7 +41,7 @@ bg_color = Color(1, 0.952941, 0.839216, 1)
 border_width_left = 4
 border_width_top = 4
 border_width_right = 4
-border_width_bottom = 4
+border_width_bottom = 10
 border_color = Color(0.956863, 0.721569, 0.376471, 1)
 corner_radius_top_left = 22
 corner_radius_top_right = 22
@@ -57,7 +58,7 @@ grow_vertical = 2
 theme = ExtResource("0_theme")
 script = ExtResource("1_main")
 
-[node name="Background" type="ColorRect" parent="." unique_id=102460983]
+[node name="Background" type="Control" parent="." unique_id=102460983]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -65,7 +66,9 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.74902, 0.898039, 1, 1)
+script = ExtResource("18_backdrop")
+top = Color(0.823529, 0.94902, 1, 1)
+bottom = Color(0.698039, 0.866667, 1, 1)
 
 [node name="Content" type="VBoxContainer" parent="." unique_id=1594193161]
 layout_mode = 0
@@ -75,39 +78,60 @@ offset_right = 664.0
 offset_bottom = 800.0
 theme_override_constants/separation = 20
 
-[node name="StarBar" type="Control" parent="Content"]
+[node name="Header" type="HBoxContainer" parent="Content"]
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="Home" type="Button" parent="Content/Header" unique_id=1003299045]
+custom_minimum_size = Vector2(76, 76)
+layout_mode = 2
+script = ExtResource("7_toy_button")
+picture = "house"
+color = Color(1, 0.705882, 0.635294, 1)
+square = true
+
+[node name="StarBar" type="Control" parent="Content/Header"]
 custom_minimum_size = Vector2(0, 64)
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
 mouse_filter = 2
 script = ExtResource("8_stars")
+
+[node name="Testing" type="PanelContainer" parent="Content/Header"]
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
 
 [node name="Board" type="Panel" parent="Content" unique_id=795404237]
 custom_minimum_size = Vector2(640, 640)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBox_board")
 
+[node name="Glow" type="Control" parent="Content/Board"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("18_backdrop")
+top = Color(0.886275, 0.964706, 1, 1)
+bottom = Color(1, 0.952941, 0.862745, 1)
+radius = 20.0
+glow = true
+bubbles = true
+
 [node name="Tray" type="Panel" parent="Content/Board" unique_id=1188483767]
 layout_mode = 1
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBox_tray")
 
-[node name="Footer" type="HBoxContainer" parent="Content"]
-custom_minimum_size = Vector2(0, 72)
+[node name="TimerBar" type="Control" parent="Content" unique_id=945660209]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-theme_override_constants/separation = 20
-
-[node name="Home" type="Button" parent="Content/Footer" unique_id=1003299045]
-custom_minimum_size = Vector2(72, 72)
-layout_mode = 2
-script = ExtResource("7_toy_button")
-picture = "house"
-color = Color(1, 0.705882, 0.635294, 1)
-
-[node name="TimerBar" type="Control" parent="Content/Footer" unique_id=945660209]
-custom_minimum_size = Vector2(0, 32)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
 script = ExtResource("2_timer")
 
 [node name="UhUh" type="AudioStreamPlayer" parent="." unique_id=1379607861]

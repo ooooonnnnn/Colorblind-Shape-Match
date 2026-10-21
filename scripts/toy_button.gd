@@ -13,6 +13,7 @@ const POP := preload("res://sounds/pop.wav")
 @export var color := Color("ffd166")
 @export var icon_color := Color.WHITE
 @export var hold_seconds := 0.0
+@export var square := false  ## a rounded square, like a toy block, rather than a circle
 
 var squash := 0.0:
 	set(v):
@@ -88,12 +89,37 @@ func _draw() -> void:
 	var r := minf(size.x, size.y) / 2 * pulse
 	var c := size / 2
 	draw_set_transform(c, 0, Vector2(1 + squash, 1 - squash))
-	draw_circle(Vector2(0, r * 0.08), r, Color(0, 0, 0, 0.18))  # soft drop shadow
-	draw_circle(Vector2.ZERO, r * 0.94, color)
-	draw_arc(Vector2.ZERO, r * 0.94, 0, TAU, 48, Icons.INK, maxf(2.0, r * 0.07), true)
-	Icons.draw(self, picture, Vector2.ZERO, r * 1.3, icon_color)
+	if square:
+		_draw_block(r)
+	else:
+		draw_circle(Vector2(0, r * 0.08), r, Color(0, 0, 0, 0.18))  # soft drop shadow
+		draw_circle(Vector2.ZERO, r * 0.94, color)
+		draw_arc(Vector2.ZERO, r * 0.94, 0, TAU, 48, Icons.INK, maxf(2.0, r * 0.07), true)
+	Icons.draw(self, picture, Vector2.ZERO, r * (1.15 if square else 1.3), icon_color)
 	if hold_seconds > 0 and _held > 0:
 		var ring := r * 1.08
 		draw_arc(Vector2.ZERO, ring, -PI / 2, -PI / 2 + TAU * minf(_held / hold_seconds, 1.0), 48, Icons.INK, r * 0.12, true)
 	if has_focus():
 		draw_arc(Vector2.ZERO, r * 1.1, 0, TAU, 48, Color.WHITE, 3.0, true)
+
+
+## A chunky rounded square with a darker lip along its bottom, like a toy
+## block seen a little from above, and a glossy band across its top.
+func _draw_block(r: float) -> void:
+	var box := Rect2(-r * 0.94, -r * 0.94, r * 1.88, r * 1.88)
+	var block := StyleBoxFlat.new()
+	block.set_corner_radius_all(int(r * 0.5))
+	block.bg_color = Color(0, 0, 0, 0.18)  # soft drop shadow
+	draw_style_box(block, Rect2(box.position + Vector2(0, r * 0.12), box.size))
+	block.bg_color = color.darkened(0.18)  # the lip
+	draw_style_box(block, Rect2(box.position + Vector2(0, r * 0.08), box.size))
+	block.bg_color = color
+	draw_style_box(block, box)
+	var gloss := StyleBoxFlat.new()
+	gloss.set_corner_radius_all(int(r * 0.35))
+	gloss.bg_color = Color(1, 1, 1, 0.35)
+	draw_style_box(gloss, Rect2(box.position + Vector2(r * 0.22, r * 0.14), Vector2(box.size.x - r * 0.44, r * 0.42)))
+	block.draw_center = false
+	block.set_border_width_all(int(maxf(2.0, r * 0.07)))
+	block.border_color = Icons.INK
+	draw_style_box(block, box)

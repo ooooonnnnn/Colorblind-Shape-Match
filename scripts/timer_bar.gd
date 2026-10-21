@@ -1,7 +1,8 @@
 class_name TimerBar
 extends Control
-## Countdown bar that empties from the right. Low time is signalled by a
-## stripe pattern, not by color alone.
+## Countdown bar that empties from the right: a chunky pill with a drop
+## shadow and a glossy fill, like a toy. Low time is signalled by a stripe
+## pattern, not by color alone.
 
 const STRIPE := 8.0  # stripe thickness, measured across the 45° stripes
 
@@ -19,35 +20,37 @@ var low := false:
 			low = v
 			queue_redraw()
 
-var _bg := StyleBoxFlat.new()
-var _fill := StyleBoxFlat.new()
-
-
-func _init() -> void:
-	_bg.bg_color = Color(1, 1, 1, 0.6)
-	_bg.set_border_width_all(2)
-	_bg.border_color = Icons.INK
-	_bg.set_corner_radius_all(99)
-	_fill.bg_color = FG
-	_fill.set_corner_radius_all(99)
-
 
 func _draw() -> void:
-	draw_style_box(_bg, Rect2(Vector2.ZERO, size))
-	var w := size.x * ratio
-	if w <= 0:
-		return
 	var h := size.y
-	if not low:
-		draw_style_box(_fill, Rect2(0, 0, maxf(w, h), h))
-		return
-
-	draw_rect(Rect2(0, 0, w, h), MUTED)
-	var fill := PackedVector2Array([Vector2.ZERO, Vector2(w, 0), Vector2(w, h), Vector2(0, h)])
-	var step := STRIPE * sqrt(2.0)  # horizontal width of one stripe
-	var x := -h
-	while x < w:
-		var stripe := PackedVector2Array([Vector2(x, h), Vector2(x + h, 0), Vector2(x + h + step, 0), Vector2(x + step, h)])
-		for part in Geometry2D.intersect_polygons(stripe, fill):
-			draw_colored_polygon(part, FG)
-		x += step * 2
+	var pill := StyleBoxFlat.new()
+	pill.set_corner_radius_all(99)
+	pill.bg_color = Color(Icons.INK, 0.15)  # soft drop shadow
+	draw_style_box(pill, Rect2(0, 3, size.x, h))
+	pill.bg_color = Color(1, 1, 1, 0.75)
+	draw_style_box(pill, Rect2(Vector2.ZERO, size))
+	var w := size.x * ratio
+	if w > 0:
+		var inner := Rect2(3, 3, maxf(w - 6, h - 6), h - 6)
+		if not low:
+			pill.bg_color = FG
+			draw_style_box(pill, inner)
+		else:
+			var fill := Backdrop._rounded(inner, inner.size.y / 2)  # stripes stay inside the round ends
+			pill.bg_color = MUTED
+			draw_style_box(pill, inner)
+			var step := STRIPE * sqrt(2.0)  # horizontal width of one stripe
+			var x := inner.position.x - h
+			while x < inner.end.x:
+				var stripe := PackedVector2Array([Vector2(x, inner.end.y), Vector2(x + h, inner.position.y),
+						Vector2(x + h + step, inner.position.y), Vector2(x + step, inner.end.y)])
+				for part in Geometry2D.intersect_polygons(stripe, fill):
+					draw_colored_polygon(part, FG)
+				x += step * 2
+		# A glossy band along the top of the fill.
+		pill.bg_color = Color(1, 1, 1, 0.4)
+		draw_style_box(pill, Rect2(inner.position + Vector2(h * 0.3, inner.size.y * 0.12), Vector2(maxf(inner.size.x - h * 0.6, 0), inner.size.y * 0.3)))
+	pill.bg_color = Color.TRANSPARENT
+	pill.set_border_width_all(3)
+	pill.border_color = Icons.INK
+	draw_style_box(pill, Rect2(Vector2.ZERO, size))

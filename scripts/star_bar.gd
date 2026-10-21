@@ -9,7 +9,7 @@ extends Control
 const FILL := Color("ffd166")    # sunny yellow, as the timer bar
 const UNLIT := Color(1, 1, 1, 0.55)  # the star before the meter reaches it
 const DIVIDER := Color(0.231373, 0.184314, 0.290196, 0.45)  # Icons.INK, faded
-const TRACK := 0.5               # the meter's height, as a fraction of the bar's
+const TRACK := 0.56              # the meter's height, as a fraction of the bar's
 const STAR := 1.45               # the star's side, as a fraction of the bar's height
 const FILL_TIME := 0.3           # seconds for the meter to fill a step
 const BUMP := 0.22               # how much taller the meter swells as a step fills, at most
@@ -55,9 +55,7 @@ var _fill := StyleBoxFlat.new()
 
 
 func _init() -> void:
-	_bg.bg_color = Color(1, 1, 1, 0.6)
-	_bg.set_border_width_all(2)
-	_bg.border_color = Icons.INK
+	_bg.bg_color = Color(1, 1, 1, 0.75)
 	_bg.set_corner_radius_all(99)
 	_fill.bg_color = FILL
 	_fill.set_corner_radius_all(99)
@@ -129,11 +127,18 @@ func _draw() -> void:
 	draw_set_transform(Vector2(0, -size.y / 2 * BUMP * _bump), 0, Vector2(1, 1 + BUMP * _bump))
 	var track := _track()
 	var h := track.size.y
+	var shadow := _bg.duplicate()
+	shadow.bg_color = Color(Icons.INK, 0.15)
+	draw_style_box(shadow, Rect2(track.position + Vector2(0, 3), track.size))
 	draw_style_box(_bg, track)
 	if _shown > 0:
 		var w := maxf(track.size.x * _shown, h)
-		var fill := Rect2(track.end.x - w, track.position.y, w, h).grow(-2)
+		var fill := Rect2(track.end.x - w, track.position.y, w, h).grow(-3)
 		draw_style_box(_fill, fill)
+		# A glossy band along the top of the fill.
+		var gloss := _fill.duplicate()
+		gloss.bg_color = Color(1, 1, 1, 0.4)
+		draw_style_box(gloss, Rect2(fill.position + Vector2(h * 0.3, fill.size.y * 0.12), Vector2(maxf(fill.size.x - h * 0.6, 0), fill.size.y * 0.3)))
 		if _flash > 0 and _filling > 0:
 			# The gleam covers the step filling now, as far as the fill has reached into it.
 			var step := track.size.x / total
@@ -143,7 +148,13 @@ func _draw() -> void:
 				draw_rect(Rect2(left, fill.position.y, right - left, fill.size.y), Color(1, 1, 1, _flash * 0.6))
 	for i in range(1, total):
 		var x := track.end.x - track.size.x * i / total
-		draw_line(Vector2(x, track.position.y + 3), Vector2(x, track.end.y - 3), DIVIDER, 2.0)
+		draw_line(Vector2(x, track.position.y + 4), Vector2(x, track.end.y - 4), DIVIDER, 2.0)
+	var border := StyleBoxFlat.new()  # drawn last, over the fill
+	border.set_corner_radius_all(99)
+	border.draw_center = false
+	border.set_border_width_all(3)
+	border.border_color = Icons.INK
+	draw_style_box(border, track)
 	draw_set_transform(Vector2.ZERO)
 	if _taken:
 		return
