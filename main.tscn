@@ -121,8 +121,6 @@ script = ExtResource("18_backdrop")
 top = Color(0.886275, 0.964706, 1, 1)
 bottom = Color(1, 0.952941, 0.862745, 1)
 radius = 20.0
-glow = true
-bubbles = true
 
 [node name="Tray" type="Panel" parent="Content/Board" unique_id=1188483767]
 layout_mode = 1

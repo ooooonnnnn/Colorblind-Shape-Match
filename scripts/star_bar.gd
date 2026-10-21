@@ -10,7 +10,8 @@ const FILL := Color("ffd166")    # sunny yellow, as the timer bar
 const UNLIT := Color(1, 1, 1, 0.55)  # the star before the meter reaches it
 const DIVIDER := Color(0.231373, 0.184314, 0.290196, 0.45)  # Icons.INK, faded
 const TRACK := 0.56              # the meter's height, as a fraction of the bar's
-const STAR := 1.45               # the star's side, as a fraction of the bar's height
+const STAR := 1.15               # the star's side, as a fraction of the bar's height
+const STAR_GAP := 8.0            # px between the star and the meter's end
 const FILL_TIME := 0.3           # seconds for the meter to fill a step
 const BUMP := 0.22               # how much taller the meter swells as a step fills, at most
 const WIGGLE_EVERY := 1.1        # seconds between the star's wiggles when one step is left
@@ -115,11 +116,11 @@ func _almost() -> bool:
 	return total > 1 and _filling == total - 1 and not _taken
 
 
-## The meter, which starts under the middle of the star, so filling it reaches the star.
+## The meter, from just past the star to the right end, so filling it reaches the star.
 func _track() -> Rect2:
 	var side := size.y * STAR
 	var h := size.y * TRACK
-	return Rect2(side / 2, (size.y - h) / 2, size.x - side / 2, h)
+	return Rect2(side + STAR_GAP, (size.y - h) / 2, size.x - side - STAR_GAP, h)
 
 
 func _draw() -> void:
