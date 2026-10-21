@@ -48,7 +48,6 @@ const TUTORIAL_COLOR := Icons.INK
 @onready var chime: AudioStreamPlayer = $Chime
 @onready var pop: AudioStreamPlayer = $Pop
 @onready var boing: AudioStreamPlayer = $Boing
-@onready var whoosh: AudioStreamPlayer = $Whoosh
 @onready var bling: AudioStreamPlayer = $Bling
 @onready var fanfare: AudioStreamPlayer = $Fanfare
 @onready var finale: AudioStreamPlayer = $Finale
@@ -578,7 +577,7 @@ func end_level(cleared: bool) -> void:
 	)
 
 
-## Once the stars have reached the meter and filled it, its star flies off with a whoosh, swinging into
+## Once the stars have reached the meter and filled it, its star flies off, swinging into
 ## the middle of the board as it grows; confetti and a jingle greet it there.
 ## Timers call methods, not lambdas, so leaving for the menu mid-cheer drops them.
 func _cheer() -> void:
@@ -593,7 +592,6 @@ func _launch_star(id: int) -> void:
 	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, CHEER_HOLD, false, star_bar.star_spot(), star_counter.star_spot())
 	get_tree().create_timer(Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE).timeout.connect(_star_stored.bind(id))
 	star_bar.take_star()
-	_play_varied(whoosh, 0.1)
 	get_tree().create_timer(Effects.FLIGHT).timeout.connect(_star_landed.bind(id))
 
 
