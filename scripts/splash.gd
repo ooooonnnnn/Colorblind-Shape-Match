@@ -12,6 +12,8 @@ const NEXT := "res://menu.tscn"
 
 
 func _ready() -> void:
+	PlaySettings.load_settings()
+	PlaySettings.apply_orientation()
 	logo.modulate.a = 0.0
 	var t := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	t.tween_property(logo, "modulate:a", 1.0, FADE_IN)

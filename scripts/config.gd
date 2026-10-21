@@ -33,6 +33,7 @@ const ABOUT_TIME_BONUS := "In a timed level, each right match adds %d s (never p
 const ABOUT_EXTRA := "Extra pieces on the board, in colors this sequence's color group's type of color blindness sees as well as anyone. A player who finds them but misses the group's own pieces is missing color, not attention.\n\nCounted: every piece must be placed to clear the level. Not counted: only the group's own pieces must be, and extras are optional."
 const ABOUT_DRAG := "Pieces can always be moved by tapping one, then its hole. Dragging lets them be carried there too. Turn it off for players who find dragging hard, so every move is two taps."
 const ABOUT_TUTORIAL := "Starts each game with an extra first level: one piece in a dark color everyone can see, without dots, and a hand that keeps showing how to move it, by dragging or by tapping, until it's in. It doesn't count toward the score or the stats."
+const ABOUT_LANDSCAPE := "On phones and tablets the game stays sideways, turning only between the two sideways ways round, which gives the shapes the most room. Off, it also turns upright with the device, and the board gets narrower and taller. Computers and browsers are not affected."
 const ABOUT_DOTS := "The dots that hide the shapes, like an Ishihara plate. Smaller, tighter dots make the shapes harder to pick out. Area covered is how much of the board the dots fill."
 const ABOUT_OUTLINE := "Pieces are drawn hollow, as an outline, as a share of their size. Bolder is easier to spot; much thinner, and the line slips between the dots, where the filter can't see it."
 const ABOUT_NOISE := "Each dot's color shifts a little, so a shape can't be found by one exact color. Amount is how far colors shift; patch size is how big the areas that shift together are."
@@ -654,6 +655,12 @@ func _build_playing_page() -> void:
 	)
 	tutorial_card.add_child(tutorial)
 
+	var screen_card := _card(playing_page, "Screen", "Keep phones and tablets sideways.", ABOUT_LANDSCAPE)
+	var landscape := _switch("Lock to landscape", PlaySettings.landscape)
+	landscape.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	landscape.toggled.connect(func(on): PlaySettings.landscape = on)
+	screen_card.add_child(landscape)
+
 	var size_card := _card(playing_page, "Shape size", "Bigger shapes are easier to see and to grab.")
 	_size_slider = _slider(size_card, "Size", 5, 40, 1, ShapeView.side_fraction * 100,
 			func(v): return "%d%%" % v, _on_size_changed)
@@ -1132,7 +1139,7 @@ func _fit_columns() -> void:
 func _state() -> String:
 	return var_to_str([_levels(), dots.max_radius, dots.gap, dots.fill, dots.board_color, dots.noise, _groups,
 			ShapeView.side_fraction, ShapeView.outline_percent, ExtraShapes.difference,
-			ColorVision.mode, ColorVision.severity, PlaySettings.drag, PlaySettings.tutorial])
+			ColorVision.mode, ColorVision.severity, PlaySettings.drag, PlaySettings.tutorial, PlaySettings.landscape])
 
 
 ## Shows "Unsaved changes" by Save while there are any, and carries a held
@@ -1173,6 +1180,7 @@ func _on_back() -> void:
 
 func _leave() -> void:
 	ColorVision.load_settings()  # leave unsaved changes behind
+	PlaySettings.load_settings()
 	await get_tree().create_timer(0.15).timeout  # let the button's pop play
 	get_tree().change_scene_to_file("res://menu.tscn")
 
@@ -1185,6 +1193,7 @@ func _save() -> bool:
 			failed = true
 			push_error("Could not save config: %s" % error_string(result))
 	if not failed:
+		PlaySettings.apply_orientation()
 		_clean = _state()
 		_dirty = false
 	saved_note.text = "Couldn't save, see the log" if failed else "Saved!"
