@@ -541,9 +541,10 @@ func _offer_home() -> void:
 	)
 
 
-## Cleared levels get a cheering star, confetti and a jingle (see _cheer).
-## When time runs out there is no failure message: the pieces just float away
-## with a whoosh.
+## Every level ends with a cheering star, confetti and a jingle (see _cheer),
+## even when time runs out: then the meter fills the rest of the way at once,
+## and the pieces left float away quietly. Only a cleared level adds to score,
+## and pieces left are recorded as missed either way.
 func end_level(cleared: bool) -> void:
 	transitioning = true
 	deselect()
@@ -562,14 +563,13 @@ func end_level(cleared: bool) -> void:
 	_stop_hand()
 	if tutorial:
 		_tutorial_pending = false
-	var delay := 0.7
-	if cleared:
-		# The stars and meter filling, the star's flight, its landing, a moment
-		# to enjoy it and its trip into the counter.
-		delay = Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE + 0.1
-		_cheer()
-	else:
-		_play_varied(whoosh, 0.1)
+	if not cleared:
+		for _step in _left_to_clear:
+			star_bar.add_one()
+	# The stars and meter filling, the star's flight, its landing, a moment
+	# to enjoy it and its trip into the counter.
+	var delay := Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE + 0.1
+	_cheer()
 	_float_away(pieces)  # anything left, as a cleared level may not need every piece
 	var id := _level_id
 	get_tree().create_timer(delay).timeout.connect(func():
