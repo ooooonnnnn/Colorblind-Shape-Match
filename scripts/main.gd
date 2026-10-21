@@ -22,6 +22,9 @@ const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tr
 const TRAY_INSET := 16.0     # px between the tray and the bottom of the board
 const EDGE_GROWTH := 1.2     # pieces swell up to this when pressed, squished or picked up
 const EDGE_GAP := 16.0       # px of full-size dots kept between a piece and the board's edge
+## Soft jingles for a cleared level, one picked at random each time but never
+## the same twice running, so they stay pleasant over a long session.
+const CHEERS: Array[AudioStream] = [preload("res://sounds/cheer_1.wav"), preload("res://sounds/cheer_2.wav"), preload("res://sounds/cheer_3.wav")]
 const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 ## The tutorial level played first when PlaySettings.tutorial is on: one piece
 ## in plain sight, in a dark color everyone can see, while a TutorialHand shows
@@ -64,6 +67,7 @@ var _hand: TutorialHand
 var level_num := 0
 var score := 0  # levels cleared this run, not counting the tutorial
 var _game_over := false
+var _last_cheer := -1  # the jingle played last, see CHEERS
 var holes: Array[ShapeView] = []
 var pieces: Array[ShapeView] = []
 var selected: ShapeView
@@ -439,7 +443,7 @@ func end_game() -> void:
 		get_tree().create_timer(i * Effects.PARTY_EVERY).timeout.connect(_party_pop.bind(i))
 
 
-## Cleared levels get a cheering star, confetti and a fanfare (see _cheer).
+## Cleared levels get a cheering star, confetti and a jingle (see _cheer).
 ## When time runs out there is no failure message: the pieces just float away
 ## with a whoosh.
 func end_level(cleared: bool) -> void:
@@ -477,7 +481,7 @@ func end_level(cleared: bool) -> void:
 
 
 ## Once the stars have reached the meter and filled it, its star flies off with a whoosh, swinging into
-## the middle of the board as it grows; confetti and the fanfare greet it there.
+## the middle of the board as it grows; confetti and a jingle greet it there.
 ## Timers call methods, not lambdas, so leaving for the menu mid-cheer drops them.
 func _cheer() -> void:
 	get_tree().create_timer(Effects.STREAM_ARRIVE + StarBar.FILL_TIME).timeout.connect(_launch_star.bind(_level_id))
@@ -518,7 +522,12 @@ func _star_landed(id: int) -> void:
 	if id != _level_id:
 		return
 	effects.confetti(board.get_global_rect())
-	_play_varied(fanfare, 0.05)
+	var pick := randi() % CHEERS.size()
+	if pick == _last_cheer:
+		pick = (pick + 1 + randi() % (CHEERS.size() - 1)) % CHEERS.size()
+	_last_cheer = pick
+	fanfare.stream = CHEERS[pick]
+	_play_varied(fanfare, 0.03)
 	_buzz(60)
 
 
