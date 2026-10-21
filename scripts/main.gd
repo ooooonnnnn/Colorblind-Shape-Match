@@ -5,7 +5,8 @@ const ColorGroups := preload("res://scripts/color_groups.gd")
 const Stats := preload("res://scripts/stats.gd")
 const GroupPlate := preload("res://scripts/group_plate.gd")
 const CHEER_HOLD := 0.2  # seconds a level's star stays in the middle before flying to the counter
-const PAUSE_LAYER := 120  # above the dots (100) and effects (101), below ColorVision (128)
+const PAUSE_LAYER := 120
+const ANY_KEY_AFTER := 1.5  # seconds into the end of a run before any press goes home, so a last tap doesn't  # above the dots (100) and effects (101), below ColorVision (128)
 const PLAIN_PLATE := {"background": Color("c9ccd3"), "colors": [Color("3b2f4a")]}  # shapes in plain sight, as on the stats screen
 const MIN_LOOK_MS := 10000   # how long a level must have been up before leaving it counts its pieces as missed
 const DRAG_THRESHOLD := 14.0  # px of movement before a press counts as a drag, so a shaky tap stays a tap
@@ -22,6 +23,9 @@ const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tr
 const TRAY_INSET := 16.0     # px between the tray and the bottom of the board
 const EDGE_GROWTH := 1.2     # pieces swell up to this when pressed, squished or picked up
 const EDGE_GAP := 16.0       # px of full-size dots kept between a piece and the board's edge
+## Soft jingles for a cleared level, one picked at random each time but never
+## the same twice running, so they stay pleasant over a long session.
+const CHEERS: Array[AudioStream] = [preload("res://sounds/cheer_1.wav"), preload("res://sounds/cheer_2.wav"), preload("res://sounds/cheer_3.wav")]
 const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 ## The tutorial level played first when PlaySettings.tutorial is on: one piece
 ## in plain sight, in a dark color everyone can see, while a TutorialHand shows
@@ -64,6 +68,9 @@ var _hand: TutorialHand
 var level_num := 0
 var score := 0  # levels cleared this run, not counting the tutorial
 var _game_over := false
+var _last_cheer := -1  # the jingle played last, see CHEERS
+var _stars_won := 0  # stars earned this run, counting any still on their way to the counter
+var _any_key_home := false  # the run is over and any press now goes home
 var holes: Array[ShapeView] = []
 var pieces: Array[ShapeView] = []
 var selected: ShapeView
@@ -429,17 +436,49 @@ func end_game() -> void:
 	var rect := board.get_global_rect()
 	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.5, 0.0, true)
 	effects.confetti(rect, 120)
-	finale.play()
+	_play_varied(finale, 0.04)
 	home.start_pulse()
 	# Every star earned this run pops out of the counter and bounces around
 	# the screen until the player goes home.
 	var spot := star_counter.star_spot()
-	effects.party(spot.get_center(), star_counter.count, spot.size.x * 1.6)
-	for i in mini(star_counter.count, Effects.PARTY_MAX):
+	effects.party(spot.get_center(), _stars_won, spot.size.x * 1.6)
+	for i in mini(_stars_won, Effects.PARTY_MAX):
 		get_tree().create_timer(i * Effects.PARTY_EVERY).timeout.connect(_party_pop.bind(i))
+	get_tree().create_timer(ANY_KEY_AFTER).timeout.connect(_offer_home)
 
 
-## Cleared levels get a cheering star, confetti and a fanfare (see _cheer).
+## After the end of a run has had a moment, says that any press goes home,
+## and from then on one does (see _input).
+func _offer_home() -> void:
+	_any_key_home = true
+	var layer := CanvasLayer.new()
+	layer.layer = PAUSE_LAYER
+	add_child(layer)
+	var label := Label.new()
+	label.theme = theme
+	label.text = "Press anything to go home"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 52)
+	label.add_theme_color_override("font_outline_color", Color.WHITE)
+	label.add_theme_constant_override("outline_size", 16)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	label.offset_bottom = -70
+	layer.add_child(label)
+	# Fades in, then breathes gently so it is noticed without nagging.
+	label.modulate.a = 0.0
+	var t := label.create_tween()
+	t.tween_property(label, "modulate:a", 1.0, 0.4)
+	t.tween_callback(func():
+		var breathe := label.create_tween().set_loops().set_trans(Tween.TRANS_SINE)
+		breathe.tween_property(label, "modulate:a", 0.55, 0.9)
+		breathe.tween_property(label, "modulate:a", 1.0, 0.9)
+	)
+
+
+## Cleared levels get a cheering star, confetti and a jingle (see _cheer).
 ## When time runs out there is no failure message: the pieces just float away
 ## with a whoosh.
 func end_level(cleared: bool) -> void:
@@ -467,7 +506,7 @@ func end_level(cleared: bool) -> void:
 		delay = Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE + 0.1
 		_cheer()
 	else:
-		whoosh.play()
+		_play_varied(whoosh, 0.1)
 	_float_away(pieces)  # anything left, as a cleared level may not need every piece
 	var id := _level_id
 	get_tree().create_timer(delay).timeout.connect(func():
@@ -477,7 +516,7 @@ func end_level(cleared: bool) -> void:
 
 
 ## Once the stars have reached the meter and filled it, its star flies off with a whoosh, swinging into
-## the middle of the board as it grows; confetti and the fanfare greet it there.
+## the middle of the board as it grows; confetti and a jingle greet it there.
 ## Timers call methods, not lambdas, so leaving for the menu mid-cheer drops them.
 func _cheer() -> void:
 	get_tree().create_timer(Effects.STREAM_ARRIVE + StarBar.FILL_TIME).timeout.connect(_launch_star.bind(_level_id))
@@ -487,22 +526,22 @@ func _launch_star(id: int) -> void:
 	if id != _level_id:
 		return
 	var rect := board.get_global_rect()
+	_stars_won += 1
 	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, CHEER_HOLD, false, star_bar.star_spot(), star_counter.star_spot())
 	get_tree().create_timer(Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE).timeout.connect(_star_stored.bind(id))
 	star_bar.take_star()
-	whoosh.play()
+	_play_varied(whoosh, 0.1)
 	get_tree().create_timer(Effects.FLIGHT).timeout.connect(_star_landed.bind(id))
 
 
 ## The cheering star has reached the counter: it counts up, with a sparkle and
-## a bling.
-func _star_stored(id: int) -> void:
-	if id != _level_id:
-		return
+## a bling. It counts even if the next level has just begun, as its timer can
+## land a frame late on a slow device.
+func _star_stored(_id: int) -> void:
 	star_counter.add_one()
 	var spot := star_counter.star_spot()
 	effects.burst(spot.get_center(), spot.size.x * 0.5)
-	bling.pitch_scale = 1.5
+	bling.pitch_scale = 1.5 * randf_range(0.92, 1.08)
 	bling.play()
 	_buzz(25)
 
@@ -518,7 +557,12 @@ func _star_landed(id: int) -> void:
 	if id != _level_id:
 		return
 	effects.confetti(board.get_global_rect())
-	fanfare.play()
+	var pick := randi() % CHEERS.size()
+	if pick == _last_cheer:
+		pick = (pick + 1 + randi() % (CHEERS.size() - 1)) % CHEERS.size()
+	_last_cheer = pick
+	fanfare.stream = CHEERS[pick]
+	_play_varied(fanfare, 0.03)
 	_buzz(60)
 
 
@@ -725,6 +769,13 @@ func _buzz(ms: int) -> void:
 		Input.vibrate_handheld(ms)
 
 
+## Plays a sound a little higher or lower each time, by up to spread, so a
+## sound heard over and over never comes out quite the same.
+func _play_varied(player: AudioStreamPlayer, spread: float) -> void:
+	player.pitch_scale = randf_range(1.0 - spread, 1.0 + spread)
+	player.play()
+
+
 func _play_pop(pitch: float) -> void:
 	pop.pitch_scale = pitch
 	pop.play()
@@ -756,6 +807,13 @@ func _add_time(seconds: float) -> void:
 ## Every click starts out stray; the piece, hole or Home button it lands on
 ## claims it in its own input handler, which runs before _penalize_stray.
 func _input(event: InputEvent) -> void:
+	if _any_key_home and event.is_pressed() and not event.is_echo() \
+			and (event is InputEventMouseButton or event is InputEventScreenTouch or event is InputEventKey or event is InputEventJoypadButton):
+		_any_key_home = false
+		get_viewport().set_input_as_handled()
+		_play_pop(1.0)
+		_go_home()
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		_stray_click = true
 		_penalize_stray.call_deferred()
@@ -777,8 +835,8 @@ func reject(p: ShapeView, _hole: ShapeView) -> void:
 	_resume_search()
 	p.nod()
 	p.target_hole.bulge()
-	uh_uh.play()
-	boing.play()  # the soft spring back home
+	_play_varied(uh_uh, 0.08)
+	_play_varied(boing, 0.12)  # the soft spring back home
 	p.move_to(p.home, true, true)
 	_buzz(20)
 

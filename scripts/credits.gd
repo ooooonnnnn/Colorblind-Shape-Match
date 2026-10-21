@@ -161,6 +161,7 @@ func _pop_bubble() -> void:
 	var t := _bubble.create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	for s in [Vector2(1.12, 0.9), Vector2(0.96, 1.05), Vector2.ONE]:
 		t.tween_property(_bubble, "scale", s, 0.09)
+	_bling.pitch_scale = randf_range(0.92, 1.08)  # never quite the same twice
 	_bling.play()
 	_swish_faces()
 
