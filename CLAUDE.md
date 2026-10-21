@@ -23,8 +23,12 @@ show only through hue, so a player with the matching deficiency can't see them.
 - Scenes: `splash.tscn` → `menu.tscn` → `main.tscn` (game), `config.tscn`
   (grown-up settings), `stats.tscn`, `references.tscn`.
 - `scripts/main.gd`: the game: levels, input (drag and tap-tap), timer, stats.
-- `scripts/config.gd`: the settings page, one tab each: Levels, Dots, Colors,
-  Shapes, Color blind, Other; nothing is written until Save.
+- `scripts/config.gd`: the settings page, in tabs Levels (sequence cards, each
+  edited in a pop-up), Playing, Dots, Colors, with the color blind view beside
+  the preview; nothing is written until Save, and leaving unsaved asks first.
+- `scripts/popup_card.gd`, `info_button.gd`, `toy_switch.gd`: the pop-up window,
+  the round "?" that opens an explanation, and the on/off switch both grown-up
+  screens use. Pop-ups sit on their own CanvasLayer (110), above the dots.
 - `scripts/dots.gd` + `shaders/dot_circle.gdshader`: the Ishihara dot filter
   (a CanvasLayer that repacks circles around the tray and reads screen colors).
 - `scripts/color_groups.gd`: protan/deutan/tritan confusion-color groups.

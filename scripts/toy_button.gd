@@ -25,7 +25,7 @@ var pulse := 1.0:  # swell used to draw attention, see start_pulse
 
 var _held := 0.0  # seconds held so far, while gated; < 0 once fired
 var _holding := false
-var _pop := AudioStreamPlayer.new()
+var _pop: AudioStreamPlayer  # made in _ready, so a button never shown leaves none behind
 var _squash_tween: Tween
 var _pulse_tween: Tween
 
@@ -33,6 +33,7 @@ var _pulse_tween: Tween
 func _ready() -> void:
 	flat = true  # all drawing is in _draw
 	add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	_pop = AudioStreamPlayer.new()
 	_pop.stream = POP
 	add_child(_pop)
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND

@@ -12,6 +12,10 @@ const OPEN_TIME := 0.22  # seconds to spring open
 const CLOSE_TIME := 0.14
 const YES := Color("7bd88f")
 const DANGER := Color("ffb4a2")
+## Above the dot filter (100) and effects (101), which would otherwise cover
+## it, and below ColorVision (128), so color blind mode shows on it too.
+const LAYER := 110
+const THEME := preload("res://ui_theme.tres")  # a CanvasLayer cuts it off from the page's own
 
 var body := VBoxContainer.new()
 var buttons := HBoxContainer.new()
@@ -21,14 +25,18 @@ var _title := Label.new()
 var _closed := false
 
 
-## Opens a window with a title over parent's whole area, width as a fraction
-## of it. Fill body and buttons after.
+## Opens a window with a title over the whole screen, width as a fraction of
+## it, on its own layer under parent. Fill body and buttons after.
 static func open(parent: Node, title: String, width := 0.6) -> PopupCard:
 	var popup := PopupCard.new()
 	popup._title.text = title
 	popup._window.anchor_left = (1.0 - width) / 2
 	popup._window.anchor_right = 1.0 - (1.0 - width) / 2
-	parent.add_child(popup)
+	var layer := CanvasLayer.new()
+	layer.layer = LAYER
+	parent.add_child(layer)
+	layer.add_child(popup)
+	popup.tree_exited.connect(layer.queue_free)
 	return popup
 
 
@@ -55,6 +63,7 @@ static func info(parent: Node, title: String, text: String) -> PopupCard:
 
 
 func _init() -> void:
+	theme = THEME
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	modulate.a = 0.0  # until it springs open

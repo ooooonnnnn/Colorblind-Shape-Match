@@ -39,22 +39,22 @@ func _init(caption: String, from: float, to: float, start: float, by := 1.0, uni
 	var label := Label.new()
 	label.text = caption
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 15)
+	label.add_theme_font_size_override("font_size", 18)
 	add_child(label)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	for b in [_minus, _plus]:
-		b.custom_minimum_size = Vector2(38, 38)
+		b.custom_minimum_size = Vector2(46, 46)
 		b.color = Color("fff3d6")
 		b.icon_color = Color.WHITE
 	_minus.picture = "minus"
 	_plus.picture = "plus"
 	_minus.activated.connect(func(): _nudge(-step))
 	_plus.activated.connect(func(): _nudge(step))
-	_number.custom_minimum_size = Vector2(56, 0)
+	_number.custom_minimum_size = Vector2(64, 0)
 	_number.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_number.add_theme_font_size_override("font_size", 24)
+	_number.add_theme_font_size_override("font_size", 28)
 	row.add_child(_minus)
 	row.add_child(_number)
 	row.add_child(_plus)
