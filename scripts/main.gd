@@ -32,7 +32,7 @@ const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 ## in plain sight, in a dark color everyone can see, while a TutorialHand shows
 ## how to move it. It has no level number and leaves no stats, but its star
 ## counts toward the run's stars like any other.
-const TUTORIAL_LEVEL := {"duration": 0.0, "holes": 1, "shapes": 1, "repetitions": 1, "filter": false, "colors": "random", "time_bonus": false, "extra": 0, "extra_scored": true}
+const TUTORIAL_LEVEL := {"duration": 0.0, "holes": 1, "shapes": 1, "repetitions": 1, "filter": false, "colors": "random", "time_bonus": false, "extra": 0, "extra_scored": true, "endless_extra": false}
 const TUTORIAL_COLOR := Icons.INK
 
 @onready var content: VBoxContainer = $Content
@@ -62,6 +62,11 @@ var pieces_per_shape := 0  # copies of each shape to sort into its hole
 var level_time := 0.0      # seconds; <= 0 means no time limit
 var time_bonus := false    # matches and stray taps move the deadline (see LevelConfig)
 var extra_scored := true   # placing an extra shape counts toward clearing the level (see LevelConfig)
+var endless_extra := false  # a placed extra shape is replaced by a new one and adds a star to the run
+var _level_shapes := []     # the level's shapes, one per hole
+var _extra_colors: Array[Color] = []
+var _piece_reach := 0.0     # px a piece's outline reaches past its shape
+var _below_tray := Rect2()  # where pieces never start
 var _left_to_clear := 0    # placements still needed to clear the level
 var tutorial := false      # this level is TUTORIAL_LEVEL
 var _tutorial_pending := false  # the tutorial is still to be cleared this game
@@ -256,11 +261,15 @@ func new_level() -> void:
 	# every piece must be placed; when not, only the level's own pieces.
 	var own: int = config.holes * config.shapes
 	var extra_colors: Array[Color] = []
-	if config.extra > 0:
+	endless_extra = config.endless_extra
+	var wanted: int = 1 if endless_extra else config.extra
+	if wanted > 0:
 		extra_colors = ColorGroups.extra_colors(group, ExtraShapes.difference)
-	var extra_count: int = config.extra if not extra_colors.is_empty() else 0
+	var extra_count: int = wanted if not extra_colors.is_empty() else 0
 	var total := own + extra_count
-	extra_scored = config.extra_scored
+	# Endless extras never run out, so the level can only wait for its own pieces.
+	extra_scored = config.extra_scored and not endless_extra
+	_extra_colors = extra_colors
 	_left_to_clear = total if extra_scored else own
 	dots.show_group(group, PackedColorArray(extra_colors))
 	_level_group = group.id if config.filter else Stats.BASELINE
@@ -297,6 +306,9 @@ func new_level() -> void:
 	# The tray sits along the bottom, and pieces only start above it, not beside it.
 	var below_tray := Rect2(0, tray_rect.position.y, board_size.x, board_size.y - tray_rect.position.y)
 	var piece_spots := _scatter_pieces(piece_radii, below_tray)
+	_level_shapes = shapes
+	_piece_reach = outline_reach
+	_below_tray = below_tray
 
 	for i in hole_count:
 		var hole := ShapeView.new()
@@ -311,23 +323,16 @@ func new_level() -> void:
 
 	var colors := ColorGroups.piece_colors(group.colors.size(), hole_count, own)
 	for i in piece_radii.size():
-		var p := ShapeView.new()
-		p.setup(shapes[i % hole_count], true)
-		p.set_meta("spot_ms", -1)
-		p.set_meta("wrong", 0)
-		p.set_meta("touched_ms", -1)
+		var fill: Color
+		if i < own:
+			fill = TUTORIAL_COLOR if tutorial else dots.figure_color(colors[i])
+		else:
+			fill = extra_colors[(i - own) % extra_colors.size()]
+		var p := _add_piece(i % hole_count, fill, piece_spots[i], piece_radii[i])
 		if i < own:
 			p.set_meta("color", colors[i])
-			p.fill = TUTORIAL_COLOR if tutorial else dots.figure_color(colors[i])
 		else:
 			p.set_meta("extra", true)
-			p.fill = extra_colors[(i - own) % extra_colors.size()]
-		p.target_hole = holes[i % hole_count]
-		p.home = piece_spots[i] / board_size
-		p.norm_pos = p.home
-		board.add_child(p)
-		p.gui_input.connect(_on_piece_input.bind(p))
-		pieces.append(p)
 		# Under the filter they appear at once: a piece growing would make its
 		# dots change color in a way anyone could see, giving it away.
 		if not config.filter:
@@ -355,6 +360,54 @@ func new_level() -> void:
 	transitioning = false
 	_level_started_ms = Time.get_ticks_msec()
 	_search_from_ms = _level_started_ms + int(fade * 1000)
+
+
+## A piece of the level's shape number k, for its hole, filled with fill,
+## starting at spot (px on the board).
+func _add_piece(k: int, fill: Color, spot: Vector2, radius: float) -> ShapeView:
+	var p := ShapeView.new()
+	p.setup(_level_shapes[k], true)
+	p.set_meta("spot_ms", -1)
+	p.set_meta("wrong", 0)
+	p.set_meta("touched_ms", -1)
+	p.set_meta("radius", radius)  # px, to keep later pieces clear of it
+	p.fill = fill
+	p.target_hole = holes[k]
+	p.home = spot / board_size
+	p.norm_pos = p.home
+	board.add_child(p)
+	p.gui_input.connect(_on_piece_input.bind(p))
+	pieces.append(p)
+	return p
+
+
+## Brings in a new extra shape, in a random one of the level's shapes and extra
+## colors, at a free spot clear of the pieces on the board. Without the filter
+## it pops in like the level's first pieces; under it, it appears at once.
+func _spawn_extra() -> void:
+	var k := randi() % hole_count
+	var spots: Array[Vector2] = []
+	var radii: Array[float] = []
+	for p in pieces:
+		spots.append(p.norm_pos * board_size)
+		radii.append(p.get_meta("radius"))
+	radii.append(Shapes.radius(_level_shapes[k].points) * ShapeView.side_for(board_size) + _piece_reach)
+	var spot := _free_spot(spots, radii, _below_tray)
+	if spot == Vector2.INF:
+		return  # the board is too full for now; the level goes on without it
+	var p := _add_piece(k, _extra_colors[randi() % _extra_colors.size()], spot, radii[-1])
+	p.set_meta("extra", true)
+	if _level_group == Stats.BASELINE:
+		p.pop_in(0.0)
+
+
+## A placed endless extra sends its stars from its hole straight to the run's
+## counter, which counts up when they arrive.
+func _bank_star(p: ShapeView) -> void:
+	_stars_won += 1
+	var rect := p.target_hole.get_global_rect()
+	effects.stream_stars(rect.get_center(), star_counter.star_spot().get_center(), rect.size.x * 0.5, STARS)
+	get_tree().create_timer(Effects.STREAM_ARRIVE).timeout.connect(_star_stored.bind(_level_id))
 
 
 ## The badge at the top right: a little plate in the colors being tested and
@@ -726,6 +779,8 @@ func place(p: ShapeView) -> void:
 	play_chime()
 	if _counts(p):
 		_send_stars(p)
+	elif endless_extra:
+		_bank_star(p)
 	_buzz(30)
 	# The hole pulses with a sparkle as the piece arrives.
 	var hole := p.target_hole
@@ -741,6 +796,8 @@ func place(p: ShapeView) -> void:
 	pieces.erase(p)
 	if _counts(p):
 		_left_to_clear -= 1
+	elif endless_extra and _left_to_clear > 0:
+		_spawn_extra()
 	if _left_to_clear <= 0:
 		if not tutorial:
 			score += 1

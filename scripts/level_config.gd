@@ -1,6 +1,6 @@
 class_name LevelConfig
 ## The level sequences in config.json. Each entry is {duration, holes, shapes,
-## repetitions, filter, colors, time_bonus, extra, extra_scored}: duration <= 0
+## repetitions, filter, colors, time_bonus, extra, extra_scored, endless_extra}: duration <= 0
 ## means no time limit,
 ## shapes is pieces per hole, repetitions <= 0 repeats the entry forever, filter
 ## turns the Ishihara dots on, colors is the color group its levels use (an id
@@ -10,7 +10,10 @@ class_name LevelConfig
 ## extra shapes (see ExtraShapes) join the level's pieces on the board, and
 ## extra_scored whether they are part of the total to place: if so, every
 ## piece must be placed to clear the level; if not, only its holes * shapes
-## own pieces, and extras left when it clears float off.
+## own pieces, and extras left when it clears float off. endless_extra
+## overrides both: one extra shape starts on the board and a new one comes in
+## each time one is placed, so there is always something to find; each placed
+## one adds a star to the run, and the level clears on its own pieces.
 
 const PATH := "res://config.json"
 const TIME_BONUS := 2.0    # seconds a right match adds, up to the level's full time
@@ -34,6 +37,7 @@ static func load_levels() -> Array[Dictionary]:
 			"time_bonus": bool(entry.get("time_bonus", true)),
 			"extra": maxi(0, int(entry.get("extra", 0))),
 			"extra_scored": bool(entry.get("extra_scored", true)),
+			"endless_extra": bool(entry.get("endless_extra", false)),
 		})
 	return levels
 
@@ -43,10 +47,10 @@ static func save_levels(levels: Array[Dictionary]) -> Error:
 	var lines := PackedStringArray()
 	for e in levels:
 		var duration: float = e.duration
-		lines.append('\t\t{ "duration": %s, "holes": %d, "shapes": %d, "repetitions": %d, "filter": %s, "colors": %s, "time_bonus": %s, "extra": %d, "extra_scored": %s }' % [
+		lines.append('\t\t{ "duration": %s, "holes": %d, "shapes": %d, "repetitions": %d, "filter": %s, "colors": %s, "time_bonus": %s, "extra": %d, "extra_scored": %s, "endless_extra": %s }' % [
 				str(int(duration)) if duration == int(duration) else str(duration),
 				e.holes, e.shapes, e.repetitions, JSON.stringify(e.filter), JSON.stringify(e.colors),
-				JSON.stringify(e.time_bonus), e.extra, JSON.stringify(e.extra_scored)])
+				JSON.stringify(e.time_bonus), e.extra, JSON.stringify(e.extra_scored), JSON.stringify(e.endless_extra)])
 	var file := FileAccess.open(SettingsFile.write_path(PATH), FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
