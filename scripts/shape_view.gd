@@ -6,7 +6,11 @@ extends Control
 const CONFIG_PATH := "res://shape_size.json"
 
 const PIECE_FILL := Color("f1ede2")
-const HOLE_FILL := Color("0e1118")
+const HOLE_FILL := Color("161b28")  # very dark, a touch lighter than the shadow so the depth shows
+const HOLE_SHADOW := Color("030406")  # the top inner wall, in the hole's own shadow
+const HOLE_RIM := Color("d9a35a")     # the tray's edge turning down into the hole
+const HOLE_LIP := Color(1, 1, 1, 0.75)  # light catching the tray's edge below the hole
+const HOLE_DEPTH := 9.0  # box units the inner shadow reaches down from the hole's top edge
 const ACCENT := Color.WHITE
 const TOUCH_SLOP := 0.12  # how far past its outline a tap still lands, as a fraction of the side
 
@@ -281,6 +285,21 @@ func _draw_hollow(outline: PackedVector2Array, color: Color) -> void:
 		draw_circle(v, outline_percent / 2, color)
 
 
+## A hole cut into the tray, lit from above: a rim where the tray's edge turns
+## down, a bright lip where light catches the edge below it, the very dark
+## hole, and a deeper shadow along its top inner wall. All in box units.
+func _draw_hole(silhouette: PackedVector2Array) -> void:
+	for rim in Geometry2D.offset_polygon(silhouette, 3.5, Geometry2D.JOIN_ROUND):
+		draw_colored_polygon(rim, HOLE_RIM)
+	var lower := Transform2D(0, Vector2(0, 3.0)) * silhouette
+	for lip in Geometry2D.clip_polygons(lower, silhouette):
+		draw_colored_polygon(lip, HOLE_LIP)
+	draw_colored_polygon(silhouette, HOLE_FILL)
+	var deeper := Transform2D(0, Vector2(0, HOLE_DEPTH)) * silhouette
+	for shade in Geometry2D.clip_polygons(silhouette, deeper):
+		draw_colored_polygon(shade, HOLE_SHADOW)
+
+
 ## The outline grown outward by offset (in 100x100 box units), closed and
 ## placed on the canvas as currently drawn, moves and squashes included.
 func outline_around(offset: float) -> Array[PackedVector2Array]:
@@ -315,7 +334,7 @@ func _draw() -> void:
 		# The piece's outer edge: its outline grown by half the outline width with
 		# round corners, so a piece fits its hole exactly, corners and all.
 		for silhouette in Geometry2D.offset_polygon(_points, outline_percent / 2, Geometry2D.JOIN_ROUND):
-			draw_colored_polygon(silhouette, HOLE_FILL)
+			_draw_hole(silhouette)
 
 	draw_set_transform(Vector2.ZERO)
 	if has_focus() and _show_focus:

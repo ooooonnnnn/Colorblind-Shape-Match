@@ -4,6 +4,7 @@ const Dots := preload("res://scripts/dots.gd")
 const ColorGroups := preload("res://scripts/color_groups.gd")
 const Stats := preload("res://scripts/stats.gd")
 const GroupPlate := preload("res://scripts/group_plate.gd")
+const PAUSE_LAYER := 120  # above the dots (100) and effects (101), below ColorVision (128)
 const PLAIN_PLATE := {"background": Color("c9ccd3"), "colors": [Color("3b2f4a")]}  # shapes in plain sight, as on the stats screen
 const MIN_LOOK_MS := 10000   # how long a level must have been up before leaving it counts its pieces as missed
 const DRAG_THRESHOLD := 14.0  # px of movement before a press counts as a drag, so a shaky tap stays a tap
@@ -72,6 +73,8 @@ var _stray_click := false  # a click no piece, hole or button has claimed yet (s
 var _hover: ShapeView  # the hole a dragged piece is over, open to take it in
 var _combo := 0  # placements so far in a quick run, see COMBO_MS
 var _last_place_ms := -COMBO_MS
+var _pause_layer: CanvasLayer  # the pause screen, while paused
+var _paused_at := 0  # when the game was paused, to give the time back after
 # Stats (see Stats): pieces finished this level, waiting to be saved, and the
 # moment the player was last free to look for a piece, so a piece's spot time
 # never includes time spent handling another one.
@@ -98,7 +101,7 @@ func _ready() -> void:
 		"noise": dots.noise.duplicate(true),
 		"size_percent": snappedf(ShapeView.side_fraction * 100, 0.01),
 	}
-	home.activated.connect(_go_home)
+	home.activated.connect(_pause)
 	home.gui_input.connect(_claim_click)
 	resized.connect(_layout)
 	_layout()
@@ -476,12 +479,95 @@ func _float_away(views: Array[ShapeView], free := false) -> void:
 
 
 func _go_home() -> void:
+	get_tree().paused = false  # or the menu would start paused
 	if not transitioning:
 		# Pieces left on a board that was barely up say nothing about seeing them.
 		_finish_level(Time.get_ticks_msec() - _level_started_ms >= MIN_LOOK_MS)
 	# A moment for the button's squish and pop before the scene goes.
 	await get_tree().create_timer(0.15).timeout
 	get_tree().change_scene_to_file("res://menu.tscn")
+
+
+# ---------- Pause ----------
+
+## Freezes the game under a dimmed screen with two big toy buttons: play to
+## carry on, the house to go home. Nothing moves meanwhile, the timer
+## included, and the time away is given back to the timer and the stats.
+func _pause() -> void:
+	if _pause_layer or transitioning:
+		return
+	if drag:
+		_end_drag()  # its release would never arrive while paused
+	_paused_at = Time.get_ticks_msec()
+	get_tree().paused = true
+	_pause_layer = CanvasLayer.new()
+	_pause_layer.layer = PAUSE_LAYER
+	_pause_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(_pause_layer)
+	var screen := Control.new()
+	screen.theme = theme
+	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pause_layer.add_child(screen)
+	var dim := ColorRect.new()
+	dim.color = Color(Icons.INK, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	screen.add_child(dim)
+	var column := VBoxContainer.new()
+	column.set_anchors_preset(Control.PRESET_CENTER)
+	column.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	column.grow_vertical = Control.GROW_DIRECTION_BOTH
+	column.alignment = BoxContainer.ALIGNMENT_CENTER
+	column.add_theme_constant_override("separation", 40)
+	screen.add_child(column)
+	var title := Label.new()
+	title.text = "Paused"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 72)
+	title.add_theme_color_override("font_outline_color", Color.WHITE)
+	title.add_theme_constant_override("outline_size", 18)
+	column.add_child(title)
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	buttons.add_theme_constant_override("separation", 80)
+	column.add_child(buttons)
+	var play := ToyButton.new()
+	play.picture = "play"
+	play.color = Color("7bd88f")
+	play.custom_minimum_size = Vector2(200, 200)
+	play.activated.connect(_resume)
+	buttons.add_child(play)
+	var house := ToyButton.new()
+	house.picture = "house"
+	house.color = home.color
+	house.square = true
+	house.custom_minimum_size = Vector2(170, 170)
+	house.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	house.activated.connect(_go_home)
+	buttons.add_child(house)
+	# Spring in once laid out.
+	screen.modulate.a = 0.0
+	await get_tree().process_frame
+	column.pivot_offset = column.size / 2
+	var t := screen.create_tween().set_parallel()
+	t.tween_property(screen, "modulate:a", 1.0, 0.15)
+	t.tween_property(column, "scale", Vector2.ONE, 0.3).from(Vector2.ONE * 0.8).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _resume() -> void:
+	if not _pause_layer:
+		return
+	var away := Time.get_ticks_msec() - _paused_at
+	deadline_ms += away
+	_level_started_ms += away
+	_search_from_ms += away
+	_last_place_ms += away
+	var layer := _pause_layer
+	_pause_layer = null
+	get_tree().paused = false
+	var screen: Control = layer.get_child(0)
+	var t := screen.create_tween()
+	t.tween_property(screen, "modulate:a", 0.0, 0.15)
+	t.tween_callback(layer.queue_free)
 
 
 func _process(delta: float) -> void:

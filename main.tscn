@@ -87,7 +87,7 @@ theme_override_constants/separation = 22
 custom_minimum_size = Vector2(76, 76)
 layout_mode = 2
 script = ExtResource("7_toy_button")
-picture = "house"
+picture = "pause"
 color = Color(1, 0.705882, 0.635294, 1)
 square = true
 
