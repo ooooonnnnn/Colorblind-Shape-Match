@@ -37,6 +37,7 @@ const ABOUT_LANDSCAPE := "On phones and tablets the game stays sideways, turning
 const ABOUT_DOTS := "The dots that hide the shapes, like an Ishihara plate. Smaller, tighter dots make the shapes harder to pick out. Area covered is how much of the board the dots fill."
 const ABOUT_OUTLINE := "Pieces are drawn hollow, as an outline, as a share of their size. Bolder is easier to spot; much thinner, and the line slips between the dots, where the filter can't see it."
 const ABOUT_NOISE := "Each dot's color shifts a little, so a shape can't be found by one exact color. Amount is how far colors shift; patch size is how big the areas that shift together are."
+const ABOUT_FADE_IN := "The first time the dots come on in a game, the shapes show plainly for a moment and the dots fade in over them, so the player knows what they're looking for. The clock waits until the dots are fully in. Off, the dots are there from the start."
 const ABOUT_BOARD := "The color between the dots and on the board, like the paper of a printed plate. It is the same around every dot, so it never gives a shape away."
 const ABOUT_GROUPS := "Each group is made for one type of color blindness: its piece colors blend into its background for that type. The level sequences use these groups.\n\nThe bar under each piece color shows whether it really blends in for that type: green blends in, orange may be spotted."
 const ABOUT_EXTRA_COLORS := "Extra shapes take colors outside the group's confusion line, which its type sees as well as anyone. This sets how different they look from the background to that type, as a CIELAB distance: around 10 is subtle, 40 and up is plain to see. How many each level has is set per sequence."
@@ -732,6 +733,12 @@ func _build_dots_page() -> void:
 		if part != Dots.NOISE_PARTS.keys()[-1]:
 			fold.add_child(HSeparator.new())
 
+	var fade_card := _card(dots_page, "Fade in", "Show the shapes first, then fade the dots in over them.", ABOUT_FADE_IN)
+	var fade := _switch("Fade in the first dots", PlaySettings.fade_in)
+	fade.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	fade.toggled.connect(func(on): PlaySettings.fade_in = on)
+	fade_card.add_child(fade)
+
 	var board_card := _card(dots_page, "Board background", "The paper color between the dots.", ABOUT_BOARD)
 	_board_color.custom_minimum_size = Vector2(140, 52)
 	_board_color.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
@@ -1139,7 +1146,7 @@ func _fit_columns() -> void:
 func _state() -> String:
 	return var_to_str([_levels(), dots.max_radius, dots.gap, dots.fill, dots.board_color, dots.noise, _groups,
 			ShapeView.side_fraction, ShapeView.outline_percent, ExtraShapes.difference,
-			ColorVision.mode, ColorVision.severity, PlaySettings.drag, PlaySettings.tutorial, PlaySettings.landscape])
+			ColorVision.mode, ColorVision.severity, PlaySettings.drag, PlaySettings.tutorial, PlaySettings.landscape, PlaySettings.fade_in])
 
 
 ## Shows "Unsaved changes" by Save while there are any, and carries a held

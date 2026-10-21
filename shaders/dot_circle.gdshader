@@ -15,6 +15,7 @@ uniform vec3 background_wavelength = vec3(1.0);
 uniform vec3 background_amplitude;
 uniform vec3 shape_wavelength = vec3(1.0);
 uniform vec3 shape_amplitude;
+uniform float opacity = 1.0;  // below 1 while the dots fade in over the shapes
 
 varying vec2 center;  // in px from the area's top-left corner
 
@@ -85,5 +86,5 @@ void fragment() {
 		shift.xy = vec2(0.0);
 	}
 	hsv += shift;
-	COLOR = vec4(hsv_to_rgb(vec3(fract(hsv.x), clamp(hsv.yz, 0.0, 1.0))), 1.0);
+	COLOR = vec4(hsv_to_rgb(vec3(fract(hsv.x), clamp(hsv.yz, 0.0, 1.0))), opacity);
 }

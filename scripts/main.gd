@@ -23,6 +23,7 @@ const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tr
 const TRAY_INSET := 16.0     # px between the tray and the bottom of the board
 const EDGE_GROWTH := 1.2     # pieces swell up to this when pressed, squished or picked up
 const EDGE_GAP := 16.0       # px of full-size dots kept between a piece and the board's edge
+const DOTS_FADE := 2.5       # seconds the dots take to fade in over the shapes, the first time they show
 ## Soft jingles for a cleared level, one picked at random each time but never
 ## the same twice running, so they stay pleasant over a long session.
 const CHEERS: Array[AudioStream] = [preload("res://sounds/cheer_1.wav"), preload("res://sounds/cheer_2.wav"), preload("res://sounds/cheer_3.wav")]
@@ -64,6 +65,7 @@ var extra_scored := true   # placing an extra shape counts toward clearing the l
 var _left_to_clear := 0    # placements still needed to clear the level
 var tutorial := false      # this level is TUTORIAL_LEVEL
 var _tutorial_pending := false  # the tutorial is still to be cleared this game
+var _dots_faded := false  # the dots have come on once this game, faded in or not
 var _hand: TutorialHand
 var level_num := 0
 var score := 0  # levels cleared this run, not counting the tutorial
@@ -336,14 +338,23 @@ func new_level() -> void:
 	# tray's opening uncovering pieces.
 	if config.filter:
 		dots.refresh()
+	# The first time the dots come on, the shapes show plainly and the dots fade
+	# in over them, so the player sees what they're looking for. The clock and
+	# the search times wait until the dots are fully in.
+	var fade := 0.0
+	if config.filter and not _dots_faded:
+		_dots_faded = true
+		if PlaySettings.fade_in:
+			fade = DOTS_FADE
+			dots.fade_in(fade)
 	if tutorial:
 		_hand = TutorialHand.new()
 		board.add_child(_hand)
 		_hand.play(shapes[0], TUTORIAL_COLOR, pieces[0].home, holes[0].norm_pos, PlaySettings.drag)
-	deadline_ms = Time.get_ticks_msec() + int(level_time * 1000)
+	deadline_ms = Time.get_ticks_msec() + int((level_time + fade) * 1000)
 	transitioning = false
 	_level_started_ms = Time.get_ticks_msec()
-	_search_from_ms = _level_started_ms
+	_search_from_ms = _level_started_ms + int(fade * 1000)
 
 
 ## The badge at the top right: a little plate in the colors being tested and
@@ -697,7 +708,7 @@ func _process(delta: float) -> void:
 		timer_bar.low = false
 		return
 	var remaining := maxi(0, deadline_ms - Time.get_ticks_msec())
-	timer_bar.ratio = remaining / (level_time * 1000)
+	timer_bar.ratio = minf(1.0, remaining / (level_time * 1000))  # full while the dots fade in
 	timer_bar.low = remaining < 5000
 	if remaining == 0 and not transitioning:
 		end_level(false)

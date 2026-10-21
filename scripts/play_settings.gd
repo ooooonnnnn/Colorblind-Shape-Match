@@ -4,12 +4,15 @@ class_name PlaySettings
 ## level where a hand shows how (see main.gd and TutorialHand). landscape keeps
 ## phones and tablets sideways, turning with the device between the two
 ## landscape ways round; off, the screen follows the device upright too.
+## fade_in shows the shapes plainly the first time a game's dots come on, then
+## fades the dots in over them (see main.gd).
 
 const PATH := "res://play.json"
 
 static var drag := true
 static var tutorial := false
 static var landscape := true
+static var fade_in := true
 
 
 static func load_settings() -> void:
@@ -20,6 +23,7 @@ static func load_settings() -> void:
 	drag = bool(data.get("drag", drag))
 	tutorial = bool(data.get("tutorial", tutorial))
 	landscape = bool(data.get("landscape", landscape))
+	fade_in = bool(data.get("fade_in", fade_in))
 
 
 ## Turns the screen the way landscape says; only phones and tablets can be turned.
@@ -32,5 +36,5 @@ static func save_settings() -> Error:
 	var file := FileAccess.open(SettingsFile.write_path(PATH), FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
-	file.store_string(JSON.stringify({"drag": drag, "tutorial": tutorial, "landscape": landscape}, "\t", false) + "\n")
+	file.store_string(JSON.stringify({"drag": drag, "tutorial": tutorial, "landscape": landscape, "fade_in": fade_in}, "\t", false) + "\n")
 	return OK
