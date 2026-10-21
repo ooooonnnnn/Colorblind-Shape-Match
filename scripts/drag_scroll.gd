@@ -50,10 +50,20 @@ var _glide: ScrollContainer  # the scroll still moving after a swipe, or null
 var _glide_speed := 0.0  # px/s, positive scrolls down the page
 var _glide_pos := 0.0  # exact scroll position, as scroll_vertical is whole pixels
 var _replaying := false  # true while held-back events are sent on, so _input lets them by
+## On a touchscreen each press also comes as an InputEventScreenTouch, beside
+## the mouse events copied from it. While a press is being held back here, its
+## touch events are held back too: reaching a switch on their own, they left
+## it untoggled when the tap was replayed, so only a swipe toggled it.
+var _owns_touch := false
 
 
 func _input(event: InputEvent) -> void:
 	if _replaying:
+		return
+	if event is InputEventScreenTouch and _owns_touch:
+		get_viewport().set_input_as_handled()
+		if not event.pressed:
+			_owns_touch = false
 		return
 	if event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 		var scroll := _scroll_at(event.position)
@@ -76,6 +86,7 @@ func _input(event: InputEvent) -> void:
 						"slider": _slider_at(scroll, event.position), "mode": DECIDING, "stopper": stopper}
 				_velocity = 0.0
 				_last_move_ms = Time.get_ticks_msec()
+				_owns_touch = true
 				get_viewport().set_input_as_handled()
 		elif not _drag.is_empty():
 			if _drag.mode == DECIDING:  # a tap, unless it only stopped a glide

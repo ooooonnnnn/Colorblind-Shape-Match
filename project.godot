@@ -11,6 +11,7 @@ config_version=5
 [application]
 
 config/name="Shape Match"
+config/icon="res://icons/icon.png"
 run/main_scene="res://splash.tscn"
 config/features=PackedStringArray("4.7")
 boot_splash/bg_color=Color(0, 0, 0, 1)
