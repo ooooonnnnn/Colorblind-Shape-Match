@@ -30,7 +30,7 @@ const EDGE_SCROLL := 90.0  # px from the list's top or bottom edge where a dragg
 const EDGE_SPEED := 700.0  # px/s it scrolls at, right at the edge
 const ABOUT_SEQUENCES := "The game plays these sequences from top to bottom. Each one plays its level the set number of times, then the next one starts. After the last, the game ends with a big star. Drag a card by the dots on its left to move it.\n\nA sequence set to play forever is the last one ever reached; any after it are shown faded."
 const ABOUT_TIME_BONUS := "In a timed level, each right match adds %d s (never past the level's full time), and each tap that lands on no piece, hole or button takes %d s away. Wrong drops cost nothing."
-const ABOUT_EXTRA := "Extra pieces on the board, in colors this sequence's color group's type of color blindness sees as well as anyone. A player who finds them but misses the group's own pieces is missing color, not attention.\n\nCounted: every piece must be placed to clear the level. Not counted: only the group's own pieces must be, and extras are optional.\n\nEndless: one extra piece is always on the board, and a new one comes in each time one is placed, so a player who can't find the group's pieces always has something to do and doesn't give up. Each one placed adds a star to the run; the level clears when the group's own pieces are in."
+const ABOUT_EXTRA := "Extra pieces on the board, in colors this sequence's color group's type of color blindness sees as well as anyone. A player who finds them but misses the group's own pieces is missing color, not attention.\n\nCounted: every piece must be placed to clear the level. Not counted: only the group's own pieces must be, and extras are optional.\n\nEndless: one extra piece is always on the board, and a new one comes in each time one is placed, so a player who can't find the group's pieces always has something to do and doesn't give up. Every piece placed, extra or not, fills a step of the level's meter, which has a step for each of the group's pieces plus one, so extras can stand in for pieces the player can't see."
 const ABOUT_DRAG := "Pieces can always be moved by tapping one, then its hole. Dragging lets them be carried there too. Turn it off for players who find dragging hard, so every move is two taps."
 const ABOUT_TUTORIAL := "Starts each game with an extra first level: one piece in a dark color everyone can see, without dots, and a hand that keeps showing how to move it, by dragging or by tapping, until it's in. It doesn't count toward the score or the stats."
 const ABOUT_LANDSCAPE := "On phones and tablets the game stays sideways, turning only between the two sideways ways round, which gives the shapes the most room. Off, it also turns upright with the device, and the board gets narrower and taller. Computers and browsers are not affected."
@@ -617,7 +617,7 @@ func _chips_for(row: Dictionary) -> Array:
 		chips.append(["No dots", "dots"])
 	var extra := int(row.extra.value)
 	if row.endless_extra.button_pressed:
-		chips.append(["Endless extra, adds stars", "extra"])
+		chips.append(["Endless extra, counted", "extra"])
 	elif extra > 0:
 		chips.append(["+%d extra, %s" % [extra, "counted" if row.extra_scored.button_pressed else "not counted"], "extra"])
 	return chips

@@ -62,7 +62,7 @@ var pieces_per_shape := 0  # copies of each shape to sort into its hole
 var level_time := 0.0      # seconds; <= 0 means no time limit
 var time_bonus := false    # matches and stray taps move the deadline (see LevelConfig)
 var extra_scored := true   # placing an extra shape counts toward clearing the level (see LevelConfig)
-var endless_extra := false  # a placed extra shape is replaced by a new one and adds a star to the run
+var endless_extra := false  # a placed extra shape is replaced by a new one (see LevelConfig)
 var _level_shapes := []     # the level's shapes, one per hole
 var _extra_colors: Array[Color] = []
 var _piece_reach := 0.0     # px a piece's outline reaches past its shape
@@ -267,8 +267,9 @@ func new_level() -> void:
 		extra_colors = ColorGroups.extra_colors(group, ExtraShapes.difference)
 	var extra_count: int = wanted if not extra_colors.is_empty() else 0
 	var total := own + extra_count
-	# Endless extras never run out, so the level can only wait for its own pieces.
-	extra_scored = config.extra_scored and not endless_extra
+	# Endless extras always count, so a player who can't see the group's pieces
+	# still fills the meter with them.
+	extra_scored = config.extra_scored or endless_extra
 	_extra_colors = extra_colors
 	_left_to_clear = total if extra_scored else own
 	dots.show_group(group, PackedColorArray(extra_colors))
@@ -399,15 +400,6 @@ func _spawn_extra() -> void:
 	p.set_meta("extra", true)
 	if _level_group == Stats.BASELINE:
 		p.pop_in(0.0)
-
-
-## A placed endless extra sends its stars from its hole straight to the run's
-## counter, which counts up when they arrive.
-func _bank_star(p: ShapeView) -> void:
-	_stars_won += 1
-	var rect := p.target_hole.get_global_rect()
-	effects.stream_stars(rect.get_center(), star_counter.star_spot().get_center(), rect.size.x * 0.5, STARS)
-	get_tree().create_timer(Effects.STREAM_ARRIVE).timeout.connect(_star_stored.bind(_level_id))
 
 
 ## The badge at the top right: a little plate in the colors being tested and
@@ -779,8 +771,6 @@ func place(p: ShapeView) -> void:
 	play_chime()
 	if _counts(p):
 		_send_stars(p)
-	elif endless_extra:
-		_bank_star(p)
 	_buzz(30)
 	# The hole pulses with a sparkle as the piece arrives.
 	var hole := p.target_hole
@@ -796,7 +786,7 @@ func place(p: ShapeView) -> void:
 	pieces.erase(p)
 	if _counts(p):
 		_left_to_clear -= 1
-	elif endless_extra and _left_to_clear > 0:
+	if endless_extra and p.has_meta("extra") and _left_to_clear > 0:
 		_spawn_extra()
 	if _left_to_clear <= 0:
 		if not tutorial:

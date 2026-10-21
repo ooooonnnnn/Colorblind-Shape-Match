@@ -11,9 +11,10 @@ class_name LevelConfig
 ## extra_scored whether they are part of the total to place: if so, every
 ## piece must be placed to clear the level; if not, only its holes * shapes
 ## own pieces, and extras left when it clears float off. endless_extra
-## overrides both: one extra shape starts on the board and a new one comes in
-## each time one is placed, so there is always something to find; each placed
-## one adds a star to the run, and the level clears on its own pieces.
+## overrides both: one extra shape starts on the board and counts, and a new
+## one comes in each time one is placed, so there is always something to find.
+## Every placement fills a step of the level's meter, which has one step per
+## own piece plus one, so extras can stand in for pieces the player can't see.
 
 const PATH := "res://config.json"
 const TIME_BONUS := 2.0    # seconds a right match adds, up to the level's full time
