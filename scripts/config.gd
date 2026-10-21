@@ -31,7 +31,7 @@ const EDGE_SPEED := 700.0  # px/s it scrolls at, right at the edge
 const ABOUT_SEQUENCES := "The game plays these sequences from top to bottom. Each one plays its level the set number of times, then the next one starts. After the last, the game ends with a big star. Drag a card by the dots on its left to move it.\n\nA sequence set to play forever is the last one ever reached; any after it are shown faded."
 const ABOUT_TIME_BONUS := "In a timed level, each right match adds %d s (never past the level's full time), and each tap that lands on no piece, hole or button takes %d s away. Wrong drops cost nothing."
 const ABOUT_EXTRA := "Extra pieces on the board, in colors this sequence's color group's type of color blindness sees as well as anyone. A player who finds them but misses the group's own pieces is missing color, not attention.\n\nCounted: every piece must be placed to clear the level. Not counted: only the group's own pieces must be, and extras are optional.\n\nWhile Endless extra shapes is on, on the Playing tab, it sets the extras for every level and these wait until it's off."
-const ABOUT_ENDLESS := "Every level gets one extra piece, in a color everyone can see, and a new one comes in each time one is placed, so a player who can't find the color group's pieces always has something to do and doesn't give up. Every piece placed, extra or not, fills a step of the level's meter, which has a step for each of the group's pieces plus one, so extras can stand in for pieces the player can't see. Those pieces are still recorded as missed.\n\nWhile it's on, the extra shapes set on each level sequence are not used."
+const ABOUT_ENDLESS := "Every level gets one extra piece, in a color everyone can see, and a new one comes in each time one is placed, so a player who can't find the color group's pieces always has something to do and doesn't give up. Every piece placed, extra or not, fills a step of the level's meter, which has a step for each of the group's pieces plus one, so extras can stand in for pieces the player can't see. Those pieces are still recorded as missed.\n\nWhile it's on, the extra shapes set on each level sequence are not used.\n\nWait: how long after an extra is placed the next one comes, so the player has a moment to look for the others first.\n\nStop once a piece is found: after the player places one of the color group's own pieces, no new extras come that level, since that player can see the colors. The meter can still be filled with the pieces left."
 const ABOUT_DRAG := "Pieces can always be moved by tapping one, then its hole. Dragging lets them be carried there too. Turn it off for players who find dragging hard, so every move is two taps."
 const ABOUT_TUTORIAL := "Starts each game with an extra first level: one piece in a dark color everyone can see, without dots, and a hand that keeps showing how to move it, by dragging or by tapping, until it's in. It doesn't count toward the score or the stats."
 const ABOUT_LANDSCAPE := "On phones and tablets the game stays sideways, turning only between the two sideways ways round, which gives the shapes the most room. Off, it also turns upright with the device, and the board gets narrower and taller. Computers and browsers are not affected."
@@ -62,6 +62,8 @@ var _level_list := VBoxContainer.new()
 var _dot_sliders := {}  # {max_radius, gap, fill: HSlider}
 var _noise_sliders := {}  # {part: {channel: {wavelength, amplitude}}} of HSliders, as in Dots.noise
 var _size_slider: HSlider
+var _extra_delay_slider: HSlider
+var _extra_stop: ToySwitch
 var _outline_slider: HSlider
 var _extra_slider: HSlider
 var _extra_swatches := VBoxContainer.new()  # each color group's extra-shape colors
@@ -666,8 +668,17 @@ func _build_playing_page() -> void:
 	endless.toggled.connect(func(on):
 		PlaySettings.endless_extra = on
 		_refresh_rows()
+		_refresh_endless()
 	)
 	endless_card.add_child(endless)
+	_extra_delay_slider = _slider(endless_card, "Wait for the next", 0, 10, 0.5, PlaySettings.extra_delay,
+			func(v): return "%s s" % (str(int(v)) if v == int(v) else "%.1f" % v),
+			func(): PlaySettings.extra_delay = _extra_delay_slider.value)
+	_extra_stop = _switch("Stop once a piece is found", PlaySettings.extra_stop)
+	_extra_stop.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_extra_stop.toggled.connect(func(on): PlaySettings.extra_stop = on)
+	endless_card.add_child(_extra_stop)
+	_refresh_endless()
 
 	var screen_card := _card(playing_page, "Screen", "Keep phones and tablets sideways.", ABOUT_LANDSCAPE)
 	var landscape := _switch("Lock to landscape", PlaySettings.landscape)
@@ -679,6 +690,12 @@ func _build_playing_page() -> void:
 	_size_slider = _slider(size_card, "Size", 5, 40, 1, ShapeView.side_fraction * 100,
 			func(v): return "%d%%" % v, _on_size_changed)
 	size_card.add_child(_note("As a share of the board's shorter side."))
+
+
+## The endless extras' wait and stop only matter while they are on.
+func _refresh_endless() -> void:
+	_extra_delay_slider.editable = PlaySettings.endless_extra
+	_extra_stop.disabled = not PlaySettings.endless_extra
 
 
 func _on_size_changed() -> void:
@@ -1159,7 +1176,8 @@ func _fit_columns() -> void:
 func _state() -> String:
 	return var_to_str([_levels(), dots.max_radius, dots.gap, dots.fill, dots.board_color, dots.noise, _groups,
 			ShapeView.side_fraction, ShapeView.outline_percent, ExtraShapes.difference,
-			ColorVision.mode, ColorVision.severity, PlaySettings.drag, PlaySettings.tutorial, PlaySettings.landscape, PlaySettings.fade_in, PlaySettings.endless_extra])
+			ColorVision.mode, ColorVision.severity, PlaySettings.drag, PlaySettings.tutorial, PlaySettings.landscape, PlaySettings.fade_in, PlaySettings.endless_extra,
+			PlaySettings.extra_delay, PlaySettings.extra_stop])
 
 
 ## Shows "Unsaved changes" by Save while there are any, and carries a held

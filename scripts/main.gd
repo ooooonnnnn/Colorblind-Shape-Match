@@ -63,6 +63,7 @@ var level_time := 0.0      # seconds; <= 0 means no time limit
 var time_bonus := false    # matches and stray taps move the deadline (see LevelConfig)
 var extra_scored := true   # placing an extra shape counts toward clearing the level (see LevelConfig)
 var endless_extra := false  # a placed extra shape is replaced by a new one (see PlaySettings)
+var _found_own := false     # a piece of the level's own has been placed, which can stop new extras
 var _level_shapes := []     # the level's shapes, one per hole
 var _extra_colors: Array[Color] = []
 var _piece_reach := 0.0     # px a piece's outline reaches past its shape
@@ -263,6 +264,7 @@ func new_level() -> void:
 	var extra_colors: Array[Color] = []
 	# Endless extras go in every level but the tutorial, which shows one piece only.
 	endless_extra = PlaySettings.endless_extra and not tutorial
+	_found_own = false
 	var wanted: int = 1 if endless_extra else config.extra
 	if wanted > 0:
 		extra_colors = ColorGroups.extra_colors(group, ExtraShapes.difference)
@@ -384,9 +386,13 @@ func _add_piece(k: int, fill: Color, spot: Vector2, radius: float) -> ShapeView:
 
 
 ## Brings in a new extra shape, in a random one of the level's shapes and extra
-## colors, at a free spot clear of the pieces on the board. Without the filter
+## colors, at a free spot clear of the pieces on the board, if it is still
+## wanted after the wait (see PlaySettings). Without the filter
 ## it pops in like the level's first pieces; under it, it appears at once.
-func _spawn_extra() -> void:
+func _spawn_extra(id: int) -> void:
+	# The level may have ended, or a piece of its own been found, while it waited.
+	if id != _level_id or transitioning or (PlaySettings.extra_stop and _found_own):
+		return
 	var k := randi() % hole_count
 	var spots: Array[Vector2] = []
 	var radii: Array[float] = []
@@ -787,8 +793,11 @@ func place(p: ShapeView) -> void:
 	pieces.erase(p)
 	if _counts(p):
 		_left_to_clear -= 1
+	if not p.has_meta("extra"):
+		_found_own = true
 	if endless_extra and p.has_meta("extra") and _left_to_clear > 0:
-		_spawn_extra()
+		# Paused time doesn't count toward the wait.
+		get_tree().create_timer(PlaySettings.extra_delay, false).timeout.connect(_spawn_extra.bind(_level_id))
 	if _left_to_clear <= 0:
 		if not tutorial:
 			score += 1
