@@ -5,7 +5,9 @@ class_name PlaySettings
 ## phones and tablets sideways, turning with the device between the two
 ## landscape ways round; off, the screen follows the device upright too.
 ## fade_in shows the shapes plainly the first time a game's dots come on, then
-## fades the dots in over them (see main.gd).
+## fades the dots in over them (see main.gd). endless_extra gives every level
+## one extra shape that counts, and a new one each time one is placed, in place
+## of each sequence's own extra and extra_scored (see LevelConfig and main.gd).
 
 const PATH := "res://play.json"
 
@@ -13,6 +15,7 @@ static var drag := true
 static var tutorial := false
 static var landscape := true
 static var fade_in := true
+static var endless_extra := false
 
 
 static func load_settings() -> void:
@@ -24,6 +27,7 @@ static func load_settings() -> void:
 	tutorial = bool(data.get("tutorial", tutorial))
 	landscape = bool(data.get("landscape", landscape))
 	fade_in = bool(data.get("fade_in", fade_in))
+	endless_extra = bool(data.get("endless_extra", endless_extra))
 
 
 ## Turns the screen the way landscape says; only phones and tablets can be turned.
@@ -36,5 +40,5 @@ static func save_settings() -> Error:
 	var file := FileAccess.open(SettingsFile.write_path(PATH), FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
-	file.store_string(JSON.stringify({"drag": drag, "tutorial": tutorial, "landscape": landscape, "fade_in": fade_in}, "\t", false) + "\n")
+	file.store_string(JSON.stringify({"drag": drag, "tutorial": tutorial, "landscape": landscape, "fade_in": fade_in, "endless_extra": endless_extra}, "\t", false) + "\n")
 	return OK

@@ -16,7 +16,7 @@ const MATCH_OK := Color("4caf7a")
 const MATCH_OFF := Color("e8a33d")
 const PREVIEW_SPACING := 16.0  # px between neighbouring preview shapes
 const TRAY_PADDING := 24.0     # px between the holes and the tray edge, as in the game
-const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1, "filter": true, "colors": "random", "time_bonus": true, "extra": 0, "extra_scored": true, "endless_extra": false}
+const NEW_LEVEL := {"duration": 30.0, "holes": 3, "shapes": 3, "repetitions": 1, "filter": true, "colors": "random", "time_bonus": true, "extra": 0, "extra_scored": true}
 const BADGE := Color("ffd166")
 const REMOVE := Color("ffb4a2")
 const MUTED := Color(0.231373, 0.184314, 0.290196, 0.8)  # Icons.INK, for explanations
@@ -30,7 +30,8 @@ const EDGE_SCROLL := 90.0  # px from the list's top or bottom edge where a dragg
 const EDGE_SPEED := 700.0  # px/s it scrolls at, right at the edge
 const ABOUT_SEQUENCES := "The game plays these sequences from top to bottom. Each one plays its level the set number of times, then the next one starts. After the last, the game ends with a big star. Drag a card by the dots on its left to move it.\n\nA sequence set to play forever is the last one ever reached; any after it are shown faded."
 const ABOUT_TIME_BONUS := "In a timed level, each right match adds %d s (never past the level's full time), and each tap that lands on no piece, hole or button takes %d s away. Wrong drops cost nothing."
-const ABOUT_EXTRA := "Extra pieces on the board, in colors this sequence's color group's type of color blindness sees as well as anyone. A player who finds them but misses the group's own pieces is missing color, not attention.\n\nCounted: every piece must be placed to clear the level. Not counted: only the group's own pieces must be, and extras are optional.\n\nEndless: one extra piece is always on the board, and a new one comes in each time one is placed, so a player who can't find the group's pieces always has something to do and doesn't give up. Every piece placed, extra or not, fills a step of the level's meter, which has a step for each of the group's pieces plus one, so extras can stand in for pieces the player can't see."
+const ABOUT_EXTRA := "Extra pieces on the board, in colors this sequence's color group's type of color blindness sees as well as anyone. A player who finds them but misses the group's own pieces is missing color, not attention.\n\nCounted: every piece must be placed to clear the level. Not counted: only the group's own pieces must be, and extras are optional.\n\nWhile Endless extra shapes is on, on the Playing tab, it sets the extras for every level and these wait until it's off."
+const ABOUT_ENDLESS := "Every level gets one extra piece, in a color everyone can see, and a new one comes in each time one is placed, so a player who can't find the color group's pieces always has something to do and doesn't give up. Every piece placed, extra or not, fills a step of the level's meter, which has a step for each of the group's pieces plus one, so extras can stand in for pieces the player can't see. Those pieces are still recorded as missed.\n\nWhile it's on, the extra shapes set on each level sequence are not used."
 const ABOUT_DRAG := "Pieces can always be moved by tapping one, then its hole. Dragging lets them be carried there too. Turn it off for players who find dragging hard, so every move is two taps."
 const ABOUT_TUTORIAL := "Starts each game with an extra first level: one piece in a dark color everyone can see, without dots, and a hand that keeps showing how to move it, by dragging or by tapping, until it's in. It doesn't count toward the score or the stats."
 const ABOUT_LANDSCAPE := "On phones and tablets the game stays sideways, turning only between the two sideways ways round, which gives the shapes the most room. Off, it also turns upright with the device, and the board gets narrower and taller. Computers and browsers are not affected."
@@ -348,7 +349,6 @@ func _add_row(entry: Dictionary) -> Dictionary:
 		"colors": OptionButton.new(),
 		"extra": Stepper.new("Extra shapes", 0, 20, entry.extra),
 		"extra_scored": _switch("Counted", entry.extra_scored),
-		"endless_extra": _switch("Endless", entry.endless_extra),
 	}
 	edit.pressed.connect(_open_editor.bind(row))
 	grip.gui_input.connect(_on_grip_input.bind(row))
@@ -364,7 +364,7 @@ func _add_row(entry: Dictionary) -> Dictionary:
 	)
 	for stepper in [row.holes, row.shapes, row.duration, row.repetitions, row.extra]:
 		stepper.changed.connect(func(_v): _refresh_rows())
-	for switch in [row.time_on, row.time_bonus, row.forever, row.filter, row.extra_scored, row.endless_extra]:
+	for switch in [row.time_on, row.time_bonus, row.forever, row.filter, row.extra_scored]:
 		switch.toggled.connect(func(_on): _refresh_rows())
 	row.editor = _build_editor(row)
 	_level_list.add_child(card)
@@ -404,7 +404,7 @@ func _build_editor(row: Dictionary) -> VBoxContainer:
 					ABOUT_TIME_BONUS % [LevelConfig.TIME_BONUS, LevelConfig.TIME_PENALTY]],
 			["How many times", "How often this level plays before the next sequence.", [row.repetitions, row.forever], ""],
 			["Dots and colors", "Hide the pieces in dots, in one color group's colors.", [row.filter, colors_box], ""],
-			["Extra shapes", "Pieces every type can see, as a check.", [row.extra, row.extra_scored, row.endless_extra], ABOUT_EXTRA]]:
+			["Extra shapes", "Pieces every type can see, as a check.", [row.extra, row.extra_scored], ABOUT_EXTRA]]:
 		editor.add_child(HSeparator.new())
 		var head := HBoxContainer.new()
 		head.add_theme_constant_override("separation", 12)
@@ -582,10 +582,9 @@ func _refresh_rows() -> void:
 		row.time_bonus.disabled = not row.time_on.button_pressed
 		row.repetitions.editable = not row.forever.button_pressed
 		row.colors.disabled = not row.filter.button_pressed
-		# Endless sets the extras itself, so their count and counting wait until it's off.
-		var endless: bool = row.endless_extra.button_pressed
-		row.extra.editable = not endless
-		row.extra_scored.disabled = endless or int(row.extra.value) == 0
+		# Endless extras set every level's extras, so these wait until it's off.
+		row.extra.editable = not PlaySettings.endless_extra
+		row.extra_scored.disabled = PlaySettings.endless_extra or int(row.extra.value) == 0
 		row.title.text = "%d %s · %d %s each" % [holes, "hole" if holes == 1 else "holes", pieces, "piece" if pieces == 1 else "pieces"]
 		for box in [row.chips, row.editor_chips]:
 			for child in box.get_children():
@@ -616,7 +615,7 @@ func _chips_for(row: Dictionary) -> Array:
 	else:
 		chips.append(["No dots", "dots"])
 	var extra := int(row.extra.value)
-	if row.endless_extra.button_pressed:
+	if PlaySettings.endless_extra:
 		chips.append(["Endless extra, counted", "extra"])
 	elif extra > 0:
 		chips.append(["+%d extra, %s" % [extra, "counted" if row.extra_scored.button_pressed else "not counted"], "extra"])
@@ -636,7 +635,6 @@ func _levels() -> Array[Dictionary]:
 			"time_bonus": row.time_bonus.button_pressed,
 			"extra": int(row.extra.value),
 			"extra_scored": row.extra_scored.button_pressed,
-			"endless_extra": row.endless_extra.button_pressed,
 		})
 	return levels
 
@@ -661,6 +659,15 @@ func _build_playing_page() -> void:
 		_refresh_tutorial_card()
 	)
 	tutorial_card.add_child(tutorial)
+
+	var endless_card := _card(playing_page, "Endless extra shapes", "Always one more piece to find, so no one gets stuck.", ABOUT_ENDLESS)
+	var endless := _switch("Endless extra shapes", PlaySettings.endless_extra)
+	endless.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	endless.toggled.connect(func(on):
+		PlaySettings.endless_extra = on
+		_refresh_rows()
+	)
+	endless_card.add_child(endless)
 
 	var screen_card := _card(playing_page, "Screen", "Keep phones and tablets sideways.", ABOUT_LANDSCAPE)
 	var landscape := _switch("Lock to landscape", PlaySettings.landscape)
@@ -1152,7 +1159,7 @@ func _fit_columns() -> void:
 func _state() -> String:
 	return var_to_str([_levels(), dots.max_radius, dots.gap, dots.fill, dots.board_color, dots.noise, _groups,
 			ShapeView.side_fraction, ShapeView.outline_percent, ExtraShapes.difference,
-			ColorVision.mode, ColorVision.severity, PlaySettings.drag, PlaySettings.tutorial, PlaySettings.landscape, PlaySettings.fade_in])
+			ColorVision.mode, ColorVision.severity, PlaySettings.drag, PlaySettings.tutorial, PlaySettings.landscape, PlaySettings.fade_in, PlaySettings.endless_extra])
 
 
 ## Shows "Unsaved changes" by Save while there are any, and carries a held

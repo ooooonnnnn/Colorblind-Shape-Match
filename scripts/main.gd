@@ -32,7 +32,7 @@ const CHIME_STEPS := [0, 2, 4, 5, 7, 9, 11]  # major scale, in semitones
 ## in plain sight, in a dark color everyone can see, while a TutorialHand shows
 ## how to move it. It has no level number and leaves no stats, but its star
 ## counts toward the run's stars like any other.
-const TUTORIAL_LEVEL := {"duration": 0.0, "holes": 1, "shapes": 1, "repetitions": 1, "filter": false, "colors": "random", "time_bonus": false, "extra": 0, "extra_scored": true, "endless_extra": false}
+const TUTORIAL_LEVEL := {"duration": 0.0, "holes": 1, "shapes": 1, "repetitions": 1, "filter": false, "colors": "random", "time_bonus": false, "extra": 0, "extra_scored": true}
 const TUTORIAL_COLOR := Icons.INK
 
 @onready var content: VBoxContainer = $Content
@@ -62,7 +62,7 @@ var pieces_per_shape := 0  # copies of each shape to sort into its hole
 var level_time := 0.0      # seconds; <= 0 means no time limit
 var time_bonus := false    # matches and stray taps move the deadline (see LevelConfig)
 var extra_scored := true   # placing an extra shape counts toward clearing the level (see LevelConfig)
-var endless_extra := false  # a placed extra shape is replaced by a new one (see LevelConfig)
+var endless_extra := false  # a placed extra shape is replaced by a new one (see PlaySettings)
 var _level_shapes := []     # the level's shapes, one per hole
 var _extra_colors: Array[Color] = []
 var _piece_reach := 0.0     # px a piece's outline reaches past its shape
@@ -261,7 +261,8 @@ func new_level() -> void:
 	# every piece must be placed; when not, only the level's own pieces.
 	var own: int = config.holes * config.shapes
 	var extra_colors: Array[Color] = []
-	endless_extra = config.endless_extra
+	# Endless extras go in every level but the tutorial, which shows one piece only.
+	endless_extra = PlaySettings.endless_extra and not tutorial
 	var wanted: int = 1 if endless_extra else config.extra
 	if wanted > 0:
 		extra_colors = ColorGroups.extra_colors(group, ExtraShapes.difference)
