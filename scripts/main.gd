@@ -461,10 +461,10 @@ func place(p: ShapeView) -> void:
 		end_level(true)
 
 
-## Stars stream from p up to the meter, which fills a step as they arrive, with
-## a sparkle where they land.
+## Stars stream from p's hole, where it has just gone in, up to the meter,
+## which fills a step as they arrive, with a sparkle where they land.
 func _send_stars(p: ShapeView) -> void:
-	var rect := p.get_global_rect()
+	var rect := p.target_hole.get_global_rect()
 	var to := star_bar.next_spot()
 	effects.stream_stars(rect.get_center(), to, rect.size.x * 0.5)
 	star_bar.add_one(Effects.STREAM_ARRIVE)
