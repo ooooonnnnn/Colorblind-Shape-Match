@@ -12,7 +12,7 @@ const DIVIDER := Color(0.231373, 0.184314, 0.290196, 0.45)  # Icons.INK, faded
 const TRACK := 0.56              # the meter's height, as a fraction of the bar's
 const STAR := 1.15               # the star's side, as a fraction of the bar's height
 const STAR_GAP := 8.0            # px between the star and the meter's end
-const FILL_TIME := 0.3           # seconds for the meter to fill a step
+const FILL_TIME := 0.22          # seconds for the meter to fill a step
 const BUMP := 0.22               # how much taller the meter swells as a step fills, at most
 const WIGGLE_EVERY := 1.1        # seconds between the star's wiggles when one step is left
 

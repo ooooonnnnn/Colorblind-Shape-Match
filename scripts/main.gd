@@ -4,6 +4,7 @@ const Dots := preload("res://scripts/dots.gd")
 const ColorGroups := preload("res://scripts/color_groups.gd")
 const Stats := preload("res://scripts/stats.gd")
 const GroupPlate := preload("res://scripts/group_plate.gd")
+const CHEER_HOLD := 0.2  # seconds a level's star stays in the middle before flying to the counter
 const PAUSE_LAYER := 120  # above the dots (100) and effects (101), below ColorVision (128)
 const PLAIN_PLATE := {"background": Color("c9ccd3"), "colors": [Color("3b2f4a")]}  # shapes in plain sight, as on the stats screen
 const MIN_LOOK_MS := 10000   # how long a level must have been up before leaving it counts its pieces as missed
@@ -411,6 +412,12 @@ func end_game() -> void:
 	effects.confetti(rect, 120)
 	finale.play()
 	home.start_pulse()
+	# Every star earned this run pops out of the counter and bounces around
+	# the screen until the player goes home.
+	var spot := star_counter.star_spot()
+	effects.party(spot.get_center(), star_counter.count, spot.size.x * 1.6)
+	for i in mini(star_counter.count, Effects.PARTY_MAX):
+		get_tree().create_timer(i * Effects.PARTY_EVERY).timeout.connect(_party_pop.bind(i))
 
 
 ## Cleared levels get a cheering star, confetti and a fanfare (see _cheer).
@@ -438,7 +445,7 @@ func end_level(cleared: bool) -> void:
 	if cleared:
 		# The stars and meter filling, the star's flight, its landing, a moment
 		# to enjoy it and its trip into the counter.
-		delay = Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + 0.9 + Effects.STORE
+		delay = Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE + 0.1
 		_cheer()
 	else:
 		whoosh.play()
@@ -461,9 +468,8 @@ func _launch_star(id: int) -> void:
 	if id != _level_id:
 		return
 	var rect := board.get_global_rect()
-	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 0.35, false, star_bar.star_spot(), star_counter.star_spot())
-	# After the landing's squash (0.32 s) and the hold, the trip in.
-	get_tree().create_timer(Effects.FLIGHT + 0.32 + 0.35 + Effects.STORE).timeout.connect(_star_stored.bind(id))
+	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, CHEER_HOLD, false, star_bar.star_spot(), star_counter.star_spot())
+	get_tree().create_timer(Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE).timeout.connect(_star_stored.bind(id))
 	star_bar.take_star()
 	whoosh.play()
 	get_tree().create_timer(Effects.FLIGHT).timeout.connect(_star_landed.bind(id))
@@ -480,6 +486,13 @@ func _star_stored(id: int) -> void:
 	bling.pitch_scale = 1.5
 	bling.play()
 	_buzz(25)
+
+
+## One of the run's stars pops out of the counter, each a little higher.
+func _party_pop(i: int) -> void:
+	_play_pop(minf(1.0 + i * 0.05, 1.8))
+	star_counter.bump()
+	_buzz(8)
 
 
 func _star_landed(id: int) -> void:

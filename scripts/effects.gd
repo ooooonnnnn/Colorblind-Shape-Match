@@ -10,11 +10,16 @@ const GLOW_REACH := 24.0  # how far the glow fades out past a piece's outline, i
 const GLOW_COLOR := Color(1.0, 0.93, 0.62)  # warm golden white, bright on the blue-gray board and the dots
 const GLOW_STRENGTH := 0.4  # opacity right at the outline
 const GLOW_BANDS := 24
-const FLIGHT := 0.5   # seconds for a cheering star to fly in from its start (see cheer)
+const FLIGHT := 0.4   # seconds for a cheering star to fly in from its start (see cheer)
 const SWING := 0.35   # how far the flight path bows out to the side, as a fraction of its length
-const STREAM_ARRIVE := 0.3   # seconds before the first streaming stars reach their target
+const STREAM_ARRIVE := 0.22  # seconds before the first streaming stars reach their target
 const STREAM_SPREAD := 0.15  # seconds over which the rest of them leave, so they arrive in a run
-const STORE := 0.4    # seconds for a cheering star to fly off into its counter (see cheer)
+const STORE := 0.3    # seconds for a cheering star to fly off into its counter (see cheer)
+const LAND := 0.24    # seconds a cheering star squashes and stretches as it arrives
+const PARTY_GRAVITY := 1500.0  # px/s², the stars bouncing around at the end of a run
+const PARTY_HOP := 950.0       # px/s, how hard they spring off the bottom of the screen
+const PARTY_EVERY := 0.1       # seconds between stars popping out
+const PARTY_MAX := 60          # at most this many bounce, however many were earned
 const RAYS := 12          # light rays turning slowly behind a cheering star
 const RAY_TURN := 0.6     # radians per second
 
@@ -26,6 +31,8 @@ var _canvas := Node2D.new()
 var _star_node: Node2D
 var _star_tween: Tween
 var _rays := 0.0  # how strongly the rays behind the cheering star show, 0 to 1
+## Each: {pos, vel, angle, spin, side, wait}; see party.
+var _party: Array[Dictionary] = []
 var _glowing: ShapeView  # the picked-up piece, or null
 
 
@@ -75,6 +82,17 @@ static func draw_star(canvas: CanvasItem, center: Vector2, side: float, color: C
 	for eye in [-1, 1]:
 		canvas.draw_circle(center + Vector2(eye * side * 0.08, -side * 0.02), side * 0.03, Icons.INK)
 	canvas.draw_arc(center + Vector2(0, side * 0.04), side * 0.07, 0.2, PI - 0.2, 16, Icons.INK, side * 0.025, true)
+
+
+## count happy stars of about side px popping out of from one by one, every
+## PARTY_EVERY seconds, then bouncing around the screen for good: off its
+## sides and top, and springing up again each time they reach the bottom.
+func party(from: Vector2, count: int, side: float) -> void:
+	for i in mini(count, PARTY_MAX):
+		_party.append({
+			"pos": from, "vel": Vector2(randf_range(-550, 550), randf_range(-1200, -800)),
+			"angle": 0.0, "spin": randf_range(-5, 5), "side": side * randf_range(0.8, 1.2), "wait": i * PARTY_EVERY,
+		})
 
 
 ## A white ring that bursts out from center and fades, like the thud of a landing.
@@ -127,7 +145,7 @@ func cheer(center: Vector2, side: float, hold := 1.0, stay := false, from := Rec
 	_star_tween.tween_callback(_land.bind(center, side))
 	# Squash and stretch on the way in, then settle.
 	for s in [Vector2(1.3, 0.8), Vector2(0.9, 1.15), Vector2(1.05, 0.97), Vector2.ONE]:
-		_star_tween.tween_property(_star_node, "scale", s, 0.08)
+		_star_tween.tween_property(_star_node, "scale", s, LAND / 4)
 	if stay:
 		_star_tween.tween_callback(func():
 			_star_tween = create_tween().set_loops().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -214,6 +232,8 @@ func _process(delta: float) -> void:
 		_canvas.queue_redraw()  # follows the piece as it moves and scales
 	if _star_node and _rays > 0:
 		_star_node.queue_redraw()  # the rays keep turning
+	if not _party.is_empty():
+		_bounce_party(delta)
 	if _particles.is_empty():
 		return
 	for p in _particles:
@@ -232,6 +252,33 @@ func _process(delta: float) -> void:
 		p.pos += p.vel * delta
 		p.angle += p.spin * delta
 	_particles.assign(_particles.filter(func(p): return p.age < p.life))
+	_canvas.queue_redraw()
+
+
+func _bounce_party(delta: float) -> void:
+	var room := get_viewport().get_visible_rect().size
+	for s in _party:
+		if s.wait > 0:
+			s.wait -= delta
+			continue
+		s.vel.y += PARTY_GRAVITY * delta
+		s.pos += s.vel * delta
+		s.angle += s.spin * delta
+		var r: float = s.side / 2
+		if s.pos.y > room.y - r:
+			# Always a fresh, slightly different hop, so they never settle.
+			s.pos.y = room.y - r
+			s.vel.y = -PARTY_HOP * randf_range(0.8, 1.2)
+			s.spin = randf_range(-5, 5)
+		elif s.pos.y < r:
+			s.pos.y = r
+			s.vel.y = absf(s.vel.y)
+		if s.pos.x < r:
+			s.pos.x = r
+			s.vel.x = absf(s.vel.x)
+		elif s.pos.x > room.x - r:
+			s.pos.x = room.x - r
+			s.vel.x = -absf(s.vel.x)
 	_canvas.queue_redraw()
 
 
@@ -271,4 +318,8 @@ func _draw_particles() -> void:
 			_canvas.draw_rect(Rect2(-p.size / 2, -p.size / 4, p.size, p.size / 2), color)
 		else:
 			_canvas.draw_circle(Vector2.ZERO, p.size * 0.6, color)
+	for s in _party:
+		if s.wait <= 0:
+			_canvas.draw_set_transform(s.pos, s.angle, Vector2.ONE)
+			draw_star(_canvas, Vector2.ZERO, s.side, Color("ffd166"))
 	_canvas.draw_set_transform(Vector2.ZERO)

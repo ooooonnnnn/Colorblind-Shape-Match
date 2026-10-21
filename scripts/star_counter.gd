@@ -26,6 +26,11 @@ func _init() -> void:
 ## Counts one more, with a springy bump.
 func add_one() -> void:
 	count += 1
+	bump()
+
+
+## A springy swell and a wiggle of the star.
+func bump() -> void:
 	var t := create_tween()
 	t.tween_property(self, "_bump", 0.0, 0.5).from(1.0).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
