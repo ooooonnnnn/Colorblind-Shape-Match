@@ -5,7 +5,11 @@ const ColorGroups := preload("res://scripts/color_groups.gd")
 const Stats := preload("res://scripts/stats.gd")
 const MIN_LOOK_MS := 10000   # how long a level must have been up before leaving it counts its pieces as missed
 const DRAG_THRESHOLD := 14.0  # px of movement before a press counts as a drag, so a shaky tap stays a tap
-const GLIDE_RATE := 14.0     # how fast a dragged piece catches up with the finger, per second; lower trails more
+const GLIDE_RATE := 22.0     # how fast a dragged piece catches up with the finger, per second; lower trails more
+const MAGNET := 0.3          # how far a piece hovering over a hole is pulled toward its center, 0 to 1
+const COMBO_MS := 2500       # placements closer together than this make a combo, sending more stars
+const STARS := 20            # stars streaming to the meter for a placement
+const COMBO_STARS := 8       # more stars for each placement of a combo, up to three
 const LEAN_MAX := 12.0       # degrees a dragged piece leans into its motion at most
 const LEAN_SPEED := 1200.0   # px/s of sideways motion that gives the full lean
 const LEAN_RATE := 10.0      # how fast the lean follows changes in motion, per second
@@ -32,6 +36,7 @@ const TUTORIAL_COLOR := Icons.INK
 @onready var pop: AudioStreamPlayer = $Pop
 @onready var boing: AudioStreamPlayer = $Boing
 @onready var whoosh: AudioStreamPlayer = $Whoosh
+@onready var bling: AudioStreamPlayer = $Bling
 @onready var fanfare: AudioStreamPlayer = $Fanfare
 @onready var finale: AudioStreamPlayer = $Finale
 @onready var dots: Dots = $Dots
@@ -60,6 +65,9 @@ var board_size := Vector2.ZERO  # the board's laid-out size, known before contai
 var _level_id := 0  # lets a pending level change notice it was superseded
 var _chime_step := 0  # rises with each placement, resets each level
 var _stray_click := false  # a click no piece, hole or button has claimed yet (see _input)
+var _hover: ShapeView  # the hole a dragged piece is over, open to take it in
+var _combo := 0  # placements so far in a quick run, see COMBO_MS
+var _last_place_ms := -COMBO_MS
 # Stats (see Stats): pieces finished this level, waiting to be saved, and the
 # moment the player was last free to look for a piece, so a piece's spot time
 # never includes time spent handling another one.
@@ -79,6 +87,8 @@ func _ready() -> void:
 	ShapeView.load_size()
 	ExtraShapes.load_settings()
 	dots.colors_changed.connect(_recolor_pieces)
+	pop.max_polyphony = 4  # quick runs of pops and blings overlap rather than cut each other off
+	bling.max_polyphony = 4
 	_session_info = {
 		"start": _session,
 		"noise": dots.noise.duplicate(true),
@@ -198,6 +208,7 @@ func new_level() -> void:
 		end_game()
 		return
 	_chime_step = 0
+	_combo = 0
 	if not tutorial:
 		level_num += 1
 	effects.clear_star()
@@ -252,6 +263,9 @@ func new_level() -> void:
 		board.add_child(hole)
 		hole.gui_input.connect(_on_hole_input.bind(hole))
 		holes.append(hole)
+		# The holes pop up one after another, each with a pop a little higher.
+		hole.pop_in(i * 0.07)
+		get_tree().create_timer(i * 0.07 + 0.05).timeout.connect(_play_pop.bind(1.0 + i * 0.12))
 
 	var colors := ColorGroups.piece_colors(group.colors.size(), hole_count, own)
 	for i in piece_radii.size():
@@ -272,6 +286,10 @@ func new_level() -> void:
 		board.add_child(p)
 		p.gui_input.connect(_on_piece_input.bind(p))
 		pieces.append(p)
+		# Under the filter they appear at once: a piece growing would make its
+		# dots change color in a way anyone could see, giving it away.
+		if not config.filter:
+			p.pop_in(0.12 + i * 0.04)
 
 	# new_level runs from a timer, after this frame's _process, so the filter
 	# would otherwise show the last level's circles for a frame, with the old
@@ -345,10 +363,10 @@ func end_level(cleared: bool) -> void:
 	_stop_hand()
 	if tutorial:
 		_tutorial_pending = false
-	var delay := 0.8
+	var delay := 0.7
 	if cleared:
 		# The stars and meter filling, the star's flight, its landing and a moment to enjoy it.
-		delay = Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + 1.1
+		delay = Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + 0.9
 		_cheer()
 	else:
 		whoosh.play()
@@ -371,7 +389,7 @@ func _launch_star(id: int) -> void:
 	if id != _level_id:
 		return
 	var rect := board.get_global_rect()
-	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 0.5, false, star_bar.star_spot())
+	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 0.35, false, star_bar.star_spot())
 	star_bar.take_star()
 	whoosh.play()
 	get_tree().create_timer(Effects.FLIGHT).timeout.connect(_star_landed.bind(id))
@@ -382,6 +400,7 @@ func _star_landed(id: int) -> void:
 		return
 	effects.confetti(board.get_global_rect())
 	fanfare.play()
+	_buzz(60)
 
 
 ## Fades and shrinks views away, then frees them if free, for views no longer
@@ -389,8 +408,8 @@ func _star_landed(id: int) -> void:
 func _float_away(views: Array[ShapeView], free := false) -> void:
 	for p in views:
 		var t := p.create_tween().set_parallel().set_trans(Tween.TRANS_SINE)
-		t.tween_property(p, "modulate:a", 0.0, 0.5)
-		t.tween_property(p, "visual_scale", 0.4, 0.5)
+		t.tween_property(p, "modulate:a", 0.0, 0.35)
+		t.tween_property(p, "visual_scale", 0.4, 0.35)
 		if free:
 			t.chain().tween_callback(p.queue_free)
 
@@ -413,7 +432,13 @@ func _process(delta: float) -> void:
 	if drag and drag.moved:
 		var p: ShapeView = drag.p
 		var was := p.norm_pos
-		p.move_to(p.norm_pos.lerp(drag.target, 1.0 - exp(-GLIDE_RATE * delta)), false)
+		# Over a hole, the hole opens up and draws the piece a little toward its middle.
+		var over := _hole_under(drag.target, p)
+		_set_hover(over)
+		var aim: Vector2 = drag.target
+		if over:
+			aim = aim.lerp(over.norm_pos, MAGNET)
+		p.move_to(p.norm_pos.lerp(aim, 1.0 - exp(-GLIDE_RATE * delta)), false)
 		if delta > 0:
 			var sideways := (p.norm_pos.x - was.x) * board.size.x / delta
 			var lean := deg_to_rad(LEAN_MAX) * clampf(sideways / LEAN_SPEED, -1.0, 1.0)
@@ -441,9 +466,10 @@ func place(p: ShapeView) -> void:
 	play_chime()
 	if _counts(p):
 		_send_stars(p)
+	_buzz(30)
 	# The hole pulses with a sparkle as the piece arrives.
 	var hole := p.target_hole
-	get_tree().create_timer(0.2).timeout.connect(func():
+	get_tree().create_timer(0.15).timeout.connect(func():
 		if is_instance_valid(hole):
 			hole.pulse()
 			var rect := hole.get_global_rect()
@@ -463,12 +489,40 @@ func place(p: ShapeView) -> void:
 
 ## Stars stream from p's hole, where it has just gone in, up to the meter,
 ## which fills a step as they arrive, with a sparkle where they land.
+## Placements in a quick run (see COMBO_MS) send more.
 func _send_stars(p: ShapeView) -> void:
+	var now := Time.get_ticks_msec()
+	_combo = _combo + 1 if now - _last_place_ms < COMBO_MS else 0
+	_last_place_ms = now
 	var rect := p.target_hole.get_global_rect()
 	var to := star_bar.next_spot()
-	effects.stream_stars(rect.get_center(), to, rect.size.x * 0.5)
+	var step := star_bar.total - _left_to_clear  # the meter step these stars fill, from 0
+	effects.stream_stars(rect.get_center(), to, rect.size.x * 0.5, STARS + COMBO_STARS * mini(_combo, 3))
 	star_bar.add_one(Effects.STREAM_ARRIVE)
-	get_tree().create_timer(Effects.STREAM_ARRIVE).timeout.connect(effects.burst.bind(to, 14.0))
+	get_tree().create_timer(Effects.STREAM_ARRIVE).timeout.connect(_stars_landed.bind(_level_id, to, step))
+
+
+## The stars reach the meter: a sparkle and a bling, higher for each step, so
+## filling the meter climbs like a scale.
+func _stars_landed(id: int, at: Vector2, step: int) -> void:
+	if id != _level_id:
+		return
+	effects.burst(at, 14.0)
+	var n := CHIME_STEPS.size()
+	bling.pitch_scale = pow(2.0, (CHIME_STEPS[step % n] + 12 * floori(step / float(n))) / 12.0)
+	bling.play()
+	_buzz(15)
+
+
+## A short buzz on phones, so a touch can be felt as well as seen and heard.
+func _buzz(ms: int) -> void:
+	if OS.has_feature("mobile"):
+		Input.vibrate_handheld(ms)
+
+
+func _play_pop(pitch: float) -> void:
+	pop.pitch_scale = pitch
+	pop.play()
 
 
 ## Whether placing p counts toward clearing the level: every piece but extra
@@ -520,7 +574,8 @@ func reject(p: ShapeView, _hole: ShapeView) -> void:
 	p.target_hole.bulge()
 	uh_uh.play()
 	boing.play()  # the soft spring back home
-	p.move_to(p.home)
+	p.move_to(p.home, true, true)
+	_buzz(20)
 
 
 func select(p: ShapeView) -> void:
@@ -626,8 +681,8 @@ func _on_hole_input(event: InputEvent, hole: ShapeView) -> void:
 ## into a tap or a drag, so it never seems unresponsive.
 func _press_feedback(view: ShapeView) -> void:
 	view.squish()
-	pop.pitch_scale = randf_range(0.9, 1.15)
-	pop.play()
+	_play_pop(randf_range(0.9, 1.15))
+	_buzz(10)
 
 
 # ---------- Drag and drop ----------
@@ -679,6 +734,7 @@ func _end_drag() -> void:
 	var drop: Vector2 = drag.get("target", p.norm_pos)
 	var was_selected: bool = drag.was_selected
 	drag = {}
+	_set_hover(null)
 	if not moved:
 		if was_selected:
 			deselect()
@@ -694,20 +750,35 @@ func _end_drag() -> void:
 		p.move_to(p.home)
 		return
 
-	# A drop counts when the bounding circles touch. _hole_row keeps holes far
-	# enough apart that a piece can touch at most one.
-	var side := ShapeView.side_for(board.size)
-	var target: ShapeView = null
-	for hole in holes:
-		var dist := ((hole.norm_pos - drop) * board.size).length()
-		if dist <= (hole.radius + p.radius) * side:
-			target = hole
-			break
-
+	var target := _hole_under(drop, p)
 	if not target:
-		p.move_to(p.home)
+		p.move_to(p.home, true, true)
 		_resume_search()
 	elif target == p.target_hole:
 		place(p)
 	else:
 		reject(p, target)
+
+
+## The hole p would drop into with its center at pos, or null. A drop counts
+## when the bounding circles touch. _hole_row keeps holes far enough apart that
+## a piece can touch at most one.
+func _hole_under(pos: Vector2, p: ShapeView) -> ShapeView:
+	var side := ShapeView.side_for(board.size)
+	for hole in holes:
+		if ((hole.norm_pos - pos) * board.size).length() <= (hole.radius + p.radius) * side:
+			return hole
+	return null
+
+
+## Opens hole and closes the last one, with a light tick as a new one opens.
+func _set_hover(hole: ShapeView) -> void:
+	if hole == _hover:
+		return
+	if is_instance_valid(_hover):
+		_hover.set_open(false)
+	_hover = hole
+	if hole:
+		hole.set_open(true)
+		_play_pop(1.5)
+		_buzz(6)

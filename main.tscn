@@ -13,6 +13,7 @@
 [ext_resource type="AudioStream" uid="uid://hvlt77h46w57" path="res://sounds/boing.wav" id="12_boing"]
 [ext_resource type="AudioStream" uid="uid://dy6sbvw6dviht" path="res://sounds/fanfare.wav" id="14_fanfare"]
 [ext_resource type="AudioStream" uid="uid://t0m1w1o7l2rc" path="res://sounds/whoosh.wav" id="16_whoosh"]
+[ext_resource type="AudioStream" uid="uid://dxuhddgo2nbrj" path="res://sounds/bling.wav" id="17_bling"]
 [ext_resource type="AudioStream" uid="uid://da7yqtfs4kiax" path="res://sounds/finale.wav" id="15_finale"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_board"]
@@ -125,6 +126,10 @@ volume_db = -6.0
 [node name="Whoosh" type="AudioStreamPlayer" parent="." unique_id=1636754945]
 stream = ExtResource("16_whoosh")
 volume_db = -4.0
+
+[node name="Bling" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("17_bling")
+volume_db = -8.0
 
 [node name="Fanfare" type="AudioStreamPlayer" parent="." unique_id=1388197001]
 stream = ExtResource("14_fanfare")

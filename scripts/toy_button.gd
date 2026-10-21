@@ -49,6 +49,8 @@ func _on_down() -> void:
 	_pop.pitch_scale = randf_range(0.9, 1.15)
 	_pop.play()
 	squish()
+	if OS.has_feature("mobile"):
+		Input.vibrate_handheld(10)  # felt as well as heard
 	if hold_seconds <= 0:
 		activated.emit()
 
