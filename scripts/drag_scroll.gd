@@ -23,7 +23,11 @@ extends Node
 ## back: they drag things around themselves, such as the grips that reorder
 ## the level sequences.
 ##
-## The mouse wheel scrolls too, wherever the pointer is on the scroll; it never
+## A press anywhere on the screen counts, not only on the scroll itself, so the
+## header, the margins or a preview beside the list scroll it too; a press
+## that turns out to be a tap still reaches whatever is under it.
+##
+## The mouse wheel scrolls too, wherever the pointer is; it never
 ## reaches the controls, so turning it over a slider does not change the slider.
 
 const SLOP_INCHES := 0.1   # how far a tap may wander, about 2.5 mm
@@ -64,7 +68,8 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			var scroll := _scroll_at(event.position)
-			if scroll and not scroll.get_v_scroll_bar().get_global_rect().has_point(event.position) 					and not _handle_at(event.position):
+			if scroll and not scroll.get_v_scroll_bar().get_global_rect().has_point(event.position) \
+					and not _handle_at(event.position):
 				var stopper := _glide == scroll and absf(_glide_speed) > STOP_GLIDE
 				_glide = null
 				_drag = {"scroll": scroll, "press": event, "start": event.position, "from": scroll.scroll_vertical,
@@ -127,11 +132,13 @@ func _process(delta: float) -> void:
 		_glide = null
 
 
-## The scroll to work on, if pos is on it.
-func _scroll_at(pos: Vector2) -> ScrollContainer:
+## The scroll to work on, wherever pos is, as long as it has something to scroll.
+func _scroll_at(_pos: Vector2) -> ScrollContainer:
 	var scroll: ScrollContainer = target.call() if target.is_valid() else null
-	if scroll and scroll.is_visible_in_tree() and scroll.get_global_rect().has_point(pos):
-		return scroll
+	if scroll and scroll.is_visible_in_tree():
+		var bar := scroll.get_v_scroll_bar()
+		if bar.max_value - bar.page > 0:
+			return scroll
 	return null
 
 

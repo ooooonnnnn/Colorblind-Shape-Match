@@ -31,6 +31,7 @@ func _on_triangle_fitted() -> void:
 	var chime := AudioStreamPlayer.new()
 	chime.stream = preload("res://sounds/chime.mp3")
 	add_child(chime)
+	chime.pitch_scale = randf_range(0.94, 1.06)  # never quite the same twice
 	chime.play()
 	play.squish(0.25)
 	play.icon_color = Color("ffd166")

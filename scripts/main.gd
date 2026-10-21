@@ -429,7 +429,7 @@ func end_game() -> void:
 	var rect := board.get_global_rect()
 	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.5, 0.0, true)
 	effects.confetti(rect, 120)
-	finale.play()
+	_play_varied(finale, 0.04)
 	home.start_pulse()
 	# Every star earned this run pops out of the counter and bounces around
 	# the screen until the player goes home.
@@ -467,7 +467,7 @@ func end_level(cleared: bool) -> void:
 		delay = Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE + 0.1
 		_cheer()
 	else:
-		whoosh.play()
+		_play_varied(whoosh, 0.1)
 	_float_away(pieces)  # anything left, as a cleared level may not need every piece
 	var id := _level_id
 	get_tree().create_timer(delay).timeout.connect(func():
@@ -490,7 +490,7 @@ func _launch_star(id: int) -> void:
 	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, CHEER_HOLD, false, star_bar.star_spot(), star_counter.star_spot())
 	get_tree().create_timer(Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE).timeout.connect(_star_stored.bind(id))
 	star_bar.take_star()
-	whoosh.play()
+	_play_varied(whoosh, 0.1)
 	get_tree().create_timer(Effects.FLIGHT).timeout.connect(_star_landed.bind(id))
 
 
@@ -502,7 +502,7 @@ func _star_stored(id: int) -> void:
 	star_counter.add_one()
 	var spot := star_counter.star_spot()
 	effects.burst(spot.get_center(), spot.size.x * 0.5)
-	bling.pitch_scale = 1.5
+	bling.pitch_scale = 1.5 * randf_range(0.92, 1.08)
 	bling.play()
 	_buzz(25)
 
@@ -518,7 +518,7 @@ func _star_landed(id: int) -> void:
 	if id != _level_id:
 		return
 	effects.confetti(board.get_global_rect())
-	fanfare.play()
+	_play_varied(fanfare, 0.05)
 	_buzz(60)
 
 
@@ -725,6 +725,13 @@ func _buzz(ms: int) -> void:
 		Input.vibrate_handheld(ms)
 
 
+## Plays a sound a little higher or lower each time, by up to spread, so a
+## sound heard over and over never comes out quite the same.
+func _play_varied(player: AudioStreamPlayer, spread: float) -> void:
+	player.pitch_scale = randf_range(1.0 - spread, 1.0 + spread)
+	player.play()
+
+
 func _play_pop(pitch: float) -> void:
 	pop.pitch_scale = pitch
 	pop.play()
@@ -777,8 +784,8 @@ func reject(p: ShapeView, _hole: ShapeView) -> void:
 	_resume_search()
 	p.nod()
 	p.target_hole.bulge()
-	uh_uh.play()
-	boing.play()  # the soft spring back home
+	_play_varied(uh_uh, 0.08)
+	_play_varied(boing, 0.12)  # the soft spring back home
 	p.move_to(p.home, true, true)
 	_buzz(20)
 
