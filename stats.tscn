@@ -69,20 +69,23 @@ text = "Stats"
 [node name="Summary" type="Label" parent="Margin/Rows/Header/Titles"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.231373, 0.184314, 0.290196, 0.7)
+theme_override_colors/font_color = Color(0.231373, 0.184314, 0.290196, 0.85)
+theme_override_font_sizes/font_size = 20
 
 [node name="Export" type="Button" parent="Margin/Rows/Header"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(220, 0)
+custom_minimum_size = Vector2(220, 56)
 layout_mode = 2
 size_flags_vertical = 4
+theme_override_font_sizes/font_size = 20
 text = "Export spreadsheet"
 
 [node name="Clear" type="Button" parent="Margin/Rows/Header"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(220, 0)
+custom_minimum_size = Vector2(220, 56)
 layout_mode = 2
 size_flags_vertical = 4
+theme_override_font_sizes/font_size = 20
 text = "Clear stats"
 
 [node name="Scroll" type="ScrollContainer" parent="Margin/Rows"]
@@ -94,11 +97,11 @@ horizontal_scroll_mode = 0
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 12
+theme_override_constants/separation = 14
 
 [node name="Disclaimer" type="Label" parent="Margin/Rows"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.231373, 0.184314, 0.290196, 0.7)
-theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.231373, 0.184314, 0.290196, 0.85)
+theme_override_font_sizes/font_size = 18
 text = "A game, not a diagnosis. The articles note that screens cannot reproduce calibrated test colors and that diagnosis needs printed plates under daylight (D65) lighting, so treat a flagged group as a reason to see an eye care professional."
 autowrap_mode = 3

@@ -36,6 +36,9 @@ static func _parts(icon: String, side: float) -> Array[PackedVector2Array]:
 					_scaled([[0.35, 0.8], [0.35, -0.3], [0.85, -0.3], [0.85, 0.8]], h)]
 		"plus":
 			return [_scaled(PLUS, h)]
+		"pause":
+			return [_scaled([[-0.6, -0.7], [-0.15, -0.7], [-0.15, 0.7], [-0.6, 0.7]], h),
+					_scaled([[0.15, -0.7], [0.6, -0.7], [0.6, 0.7], [0.15, 0.7]], h)]
 		"minus":
 			return [_scaled([[-0.75, -0.2], [0.75, -0.2], [0.75, 0.2], [-0.75, 0.2]], h)]
 		"cross":

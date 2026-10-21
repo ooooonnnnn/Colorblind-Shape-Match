@@ -23,8 +23,12 @@ show only through hue, so a player with the matching deficiency can't see them.
 - Scenes: `splash.tscn` → `menu.tscn` → `main.tscn` (game), `config.tscn`
   (grown-up settings), `stats.tscn`, `references.tscn`.
 - `scripts/main.gd`: the game: levels, input (drag and tap-tap), timer, stats.
-- `scripts/config.gd`: the settings page, one tab each: Levels, Dots, Colors,
-  Shapes, Color blind, Other; nothing is written until Save.
+- `scripts/config.gd`: the settings page, in tabs Levels (sequence cards, each
+  edited in a pop-up), Playing, Dots, Colors, with the color blind view beside
+  the preview; nothing is written until Save, and leaving unsaved asks first.
+- `scripts/popup_card.gd`, `info_button.gd`, `toy_switch.gd`: the pop-up window,
+  the round "?" that opens an explanation, and the on/off switch both grown-up
+  screens use. Pop-ups sit on their own CanvasLayer (110), above the dots.
 - `scripts/dots.gd` + `shaders/dot_circle.gdshader`: the Ishihara dot filter
   (a CanvasLayer that repacks circles around the tray and reads screen colors).
 - `scripts/color_groups.gd`: protan/deutan/tritan confusion-color groups.
@@ -79,6 +83,15 @@ files are packed at all.
 - The first level of a game may still show one stale dot frame before the
   board is laid out (only level changes were fixed).
 - The tutorial plays every game, not only the first.
+
+## Screen sizes
+
+The design size is 1080x1080 with `stretch/aspect="expand"`, so the shorter
+side is always 1080 units and the longer one grows: 2400x1080 on a wide phone,
+1440x1080 on a tablet, 1080x1542 upright. Settings and stats switch to a
+stacked or compact layout below 1300 units wide, pop-ups keep at least 720,
+and the game shrinks a level's shapes (`ShapeView.fit_scale`) when its row of
+holes would not fit across the board.
 
 ## Building and checking
 

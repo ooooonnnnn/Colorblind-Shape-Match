@@ -6,7 +6,11 @@ extends Control
 const CONFIG_PATH := "res://shape_size.json"
 
 const PIECE_FILL := Color("f1ede2")
-const HOLE_FILL := Color("0e1118")
+const HOLE_FILL := Color("161b28")  # very dark, a touch lighter than the shadow so the depth shows
+const HOLE_SHADOW := Color("030406")  # the top inner wall, in the hole's own shadow
+const HOLE_RIM := Color("d9a35a")     # the tray's edge turning down into the hole
+const HOLE_LIP := Color(1, 1, 1, 0.75)  # light catching the tray's edge below the hole
+const HOLE_DEPTH := 9.0  # box units the inner shadow reaches down from the hole's top edge
 const ACCENT := Color.WHITE
 const TOUCH_SLOP := 0.12  # how far past its outline a tap still lands, as a fraction of the side
 
@@ -15,6 +19,9 @@ static var side_fraction := 0.2  # width as a fraction of the board's shorter si
 ## hollow so they are harder to spot in the dot filter; bolder is easier, and
 ## much thinner the line slips between dot centers, where the filter samples.
 static var outline_percent := 26.0
+## Shrinks shapes below side_fraction for a level whose row of holes would
+## not fit across the board otherwise, as on an upright phone (see main.gd).
+static var fit_scale := 1.0
 
 var is_piece := false
 var shape_name := ""
@@ -64,6 +71,10 @@ var breath := 1.0:  # holes only: slow idle swell, on top of visual_scale
 	set(v):
 		breath = v
 		queue_redraw()
+var opening := 1.0:  # holes only: swell while a dragged piece hovers over it, on top of breath
+	set(v):
+		opening = v
+		queue_redraw()
 
 var _points := PackedVector2Array()  # centered on (0, 0)
 var _show_focus := false
@@ -72,6 +83,7 @@ var _scale_tween: Tween
 var _shake_tween: Tween
 var _tilt_tween: Tween
 var _squash_tween: Tween
+var _open_tween: Tween
 
 
 func setup(shape: Dictionary, piece: bool) -> void:
@@ -107,6 +119,7 @@ func _breathe() -> void:
 
 ## Reads side_fraction and outline_percent from CONFIG_PATH.
 static func load_size() -> void:
+	fit_scale = 1.0
 	var data = JSON.parse_string(FileAccess.get_file_as_string(SettingsFile.read_path(CONFIG_PATH)))
 	if not data is Dictionary:
 		push_error("Bad or missing shape size in %s" % CONFIG_PATH)
@@ -135,7 +148,7 @@ func _has_point(point: Vector2) -> bool:
 
 ## Side length in pixels of a piece or hole on a board of this size.
 static func side_for(board_size: Vector2) -> float:
-	return minf(board_size.x, board_size.y) * side_fraction
+	return minf(board_size.x, board_size.y) * side_fraction * fit_scale
 
 
 func _update_layout() -> void:
@@ -147,31 +160,57 @@ func _update_layout() -> void:
 	position = norm_pos * board.size - size / 2
 
 
-func move_to(target: Vector2, animate := true) -> void:
+## Slides to target; springy overshoots and settles, like a toy sent bouncing back.
+func move_to(target: Vector2, animate := true, springy := false) -> void:
 	if _move_tween:
 		_move_tween.kill()
 	if not animate:
 		norm_pos = target
 		return
-	_move_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_move_tween.tween_property(self, "norm_pos", target, 0.25)
+	if springy:
+		_move_tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_move_tween.tween_property(self, "norm_pos", target, 0.32)
+	else:
+		_move_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		_move_tween.tween_property(self, "norm_pos", target, 0.18)
 
 
-## Slides into a hole, then shrinks and fades away before freeing itself.
+## Snaps into a hole, swells for a moment as if gulped, then shrinks away and frees itself.
 func vanish_into(target: Vector2) -> void:
-	move_to(target)
-	var t := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-	t.tween_interval(0.2)
-	t.tween_property(self, "visual_scale", 0.0, 0.2)
-	t.parallel().tween_property(self, "modulate:a", 0.0, 0.2)
+	if _move_tween:
+		_move_tween.kill()
+	_move_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_move_tween.tween_property(self, "norm_pos", target, 0.15)
+	var t := create_tween()
+	t.tween_interval(0.1)
+	t.tween_property(self, "visual_scale", 0.0, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	t.parallel().tween_property(self, "modulate:a", 0.0, 0.18).set_delay(0.06)
 	t.tween_callback(queue_free)
 
 
 func scale_to(s: float) -> void:
 	if _scale_tween:
 		_scale_tween.kill()
-	_scale_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_scale_tween.tween_property(self, "visual_scale", s, 0.15)
+	_scale_tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_scale_tween.tween_property(self, "visual_scale", s, 0.12)
+
+
+## Springs up from nothing after delay seconds, as a level starts.
+func pop_in(delay: float) -> void:
+	visual_scale = 0.0
+	if _scale_tween:
+		_scale_tween.kill()
+	_scale_tween = create_tween()
+	_scale_tween.tween_interval(delay)
+	_scale_tween.tween_property(self, "visual_scale", 1.0, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Holes only: opens up while a dragged piece hovers over it, ready to take it in.
+func set_open(open: bool) -> void:
+	if _open_tween:
+		_open_tween.kill()
+	_open_tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_open_tween.tween_property(self, "opening", 1.12 if open else 1.0, 0.14)
 
 
 func shake() -> void:
@@ -188,7 +227,7 @@ func nod() -> void:
 		_tilt_tween.kill()
 	_tilt_tween = create_tween().set_trans(Tween.TRANS_SINE)
 	for deg in [16.0, -16.0, 10.0, -10.0, 0.0]:
-		_tilt_tween.tween_property(self, "tilt", deg_to_rad(deg), 0.09)
+		_tilt_tween.tween_property(self, "tilt", deg_to_rad(deg), 0.07)
 
 
 ## Ease back upright, as when let go after leaning into a drag.
@@ -250,6 +289,21 @@ func _draw_hollow(outline: PackedVector2Array, color: Color) -> void:
 		draw_circle(v, outline_percent / 2, color)
 
 
+## A hole cut into the tray, lit from above: a rim where the tray's edge turns
+## down, a bright lip where light catches the edge below it, the very dark
+## hole, and a deeper shadow along its top inner wall. All in box units.
+func _draw_hole(silhouette: PackedVector2Array) -> void:
+	for rim in Geometry2D.offset_polygon(silhouette, 3.5, Geometry2D.JOIN_ROUND):
+		draw_colored_polygon(rim, HOLE_RIM)
+	var lower := Transform2D(0, Vector2(0, 3.0)) * silhouette
+	for lip in Geometry2D.clip_polygons(lower, silhouette):
+		draw_colored_polygon(lip, HOLE_LIP)
+	draw_colored_polygon(silhouette, HOLE_FILL)
+	var deeper := Transform2D(0, Vector2(0, HOLE_DEPTH)) * silhouette
+	for shade in Geometry2D.clip_polygons(silhouette, deeper):
+		draw_colored_polygon(shade, HOLE_SHADOW)
+
+
 ## The outline grown outward by offset (in 100x100 box units), closed and
 ## placed on the canvas as currently drawn, moves and squashes included.
 func outline_around(offset: float) -> Array[PackedVector2Array]:
@@ -264,7 +318,7 @@ func outline_around(offset: float) -> Array[PackedVector2Array]:
 
 func _shape_transform() -> Transform2D:
 	var k := size.x / 100.0
-	return Transform2D(tilt, Vector2(1 + squash, 1 - squash) * k * visual_scale * breath, 0, size / 2 + Vector2(shake_offset, 0))
+	return Transform2D(tilt, Vector2(1 + squash, 1 - squash) * k * visual_scale * breath * opening, 0, size / 2 + Vector2(shake_offset, 0))
 
 
 func _draw() -> void:
@@ -284,7 +338,7 @@ func _draw() -> void:
 		# The piece's outer edge: its outline grown by half the outline width with
 		# round corners, so a piece fits its hole exactly, corners and all.
 		for silhouette in Geometry2D.offset_polygon(_points, outline_percent / 2, Geometry2D.JOIN_ROUND):
-			draw_colored_polygon(silhouette, HOLE_FILL)
+			_draw_hole(silhouette)
 
 	draw_set_transform(Vector2.ZERO)
 	if has_focus() and _show_focus:
