@@ -155,33 +155,33 @@ static func piece_colors(palette_size: int, shape_count: int, piece_count: int) 
 	return indices
 
 
-## Up to MAX_EXTRA_COLORS colors for extra shapes (see ExtraShapes) in group:
-## its background with one of the cones its type still has raised or lowered,
-## until that type sees it about difference (CIELAB) from the background, or
-## as far as sRGB allows. Being off the type's confusion lines, they show to
-## it and to normal vision alike. The colors closest to difference are picked.
+## Up to MAX_EXTRA_COLORS colors for extra shapes (see ExtraShapes) in group,
+## from ExtraShapes.TEMPLATE: those that every type and normal vision see at
+## least difference (CIELAB) from its background, the subtlest of them first,
+## so the slider still sets how plain they are. If too few reach it, the
+## plainest of the rest make up the number, so a level never goes without.
 static func extra_colors(group: Dictionary, difference: float) -> Array[Color]:
-	var missing: int = Vision.TYPES[group.id].cone if Vision.TYPES.has(group.id) else -1
 	var found: Array[Dictionary] = []
-	for cone in 3:
-		if cone == missing:
-			continue
-		for direction in [1.0, -1.0]:
-			var best := {}
-			for step in range(1, 400):
-				var color = Vision.shift_cone(group.background, cone, 1.0 + direction * step * 0.01)
-				if color == null:
-					break
-				best = {"color": color, "seen": seen_difference(group.id, color, group.background)}
-				if best.seen >= difference:
-					break
-			if best:
-				found.append(best)
-	found.sort_custom(func(a, b): return minf(a.seen, difference) > minf(b.seen, difference))
+	for color in ExtraShapes.TEMPLATE:
+		found.append({"color": color, "seen": seen_by_all(color, group.background)})
+	found.sort_custom(func(a, b):
+		if (a.seen >= difference) != (b.seen >= difference):
+			return a.seen >= difference
+		return a.seen < b.seen if a.seen >= difference else a.seen > b.seen
+	)
 	var colors: Array[Color] = []
 	for entry in found.slice(0, MAX_EXTRA_COLORS):
 		colors.append(entry.color)
 	return colors
+
+
+## How far apart color and background look to whoever sees them closest:
+## normal vision or any type of color blindness (CIELAB distance).
+static func seen_by_all(color: Color, background: Color) -> float:
+	var seen := seen_difference(Vision.NONE, color, background)
+	for type in Vision.TYPES:
+		seen = minf(seen, seen_difference(type, color, background))
+	return seen
 
 
 ## How far apart color and background look to the type of color blindness

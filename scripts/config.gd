@@ -41,7 +41,7 @@ const ABOUT_NOISE := "Each dot's color shifts a little, so a shape can't be foun
 const ABOUT_FADE_IN := "The first time the dots come on in a game, the shapes show plainly for a moment and the dots fade in over them, so the player knows what they're looking for. The clock waits until the dots are fully in. Off, the dots are there from the start."
 const ABOUT_BOARD := "The color between the dots and on the board, like the paper of a printed plate. It is the same around every dot, so it never gives a shape away."
 const ABOUT_GROUPS := "Each group is made for one type of color blindness: its piece colors blend into its background for that type. The level sequences use these groups.\n\nThe bar under each piece color shows whether it really blends in for that type: green blends in, orange may be spotted."
-const ABOUT_EXTRA_COLORS := "Extra shapes take colors outside the group's confusion line, which its type sees as well as anyone. This sets how different they look from the background to that type, as a CIELAB distance: around 10 is subtle, 40 and up is plain to see. How many each level has is set per sequence."
+const ABOUT_EXTRA_COLORS := "Extra shapes take colors from a fixed set (near-black, navy, dark red, charcoal, yellow and white) that stand apart from the backgrounds by lightness, which every type of color blindness still sees. So they never vanish, whoever plays.\n\nThis sets how different they must look from the background to every type and to normal vision, as a CIELAB distance: around 10 is subtle, 40 and up is plain to see, and about 50 is the most the set reaches. How many each level has is set per sequence."
 const ABOUT_VISION := "Shows the whole page as someone with that type of color blindness sees it, to check that a color group really hides its shapes. It stays on in the game too until set back to normal vision.\n\nStrength: many color blind people still have weakened cones of the missing type, so they see some of the difference. 100% is the full form."
 
 @onready var tabs: TabContainer = %Tabs
@@ -849,7 +849,7 @@ func _build_colors_page() -> void:
 	colors_page.add_child(_group_list)
 
 	var extra_card := _card(colors_page, "Extra shape colors", "How easy the extra shapes are to see.", ABOUT_EXTRA_COLORS)
-	_extra_slider = _slider(extra_card, "How easy to see", 5, 80, 1, ExtraShapes.difference,
+	_extra_slider = _slider(extra_card, "How easy to see", 5, ExtraShapes.MAX_DIFFERENCE, 1, ExtraShapes.difference,
 			func(v): return "%d" % v, _on_extra_changed)
 	_extra_swatches.add_theme_constant_override("separation", 8)
 	extra_card.add_child(_extra_swatches)
@@ -904,8 +904,8 @@ func _show_extra_colors() -> void:
 			var swatch := ColorRect.new()
 			swatch.color = color
 			swatch.custom_minimum_size = Vector2(48, 32)
-			swatch.tooltip_text = "#%s, which %s players see %d apart from the background" % [color.to_html(false), group.name,
-					roundi(ColorGroups.seen_difference(group.id, color, group.background))]
+			swatch.tooltip_text = "#%s, which every player sees at least %d apart from the background" % [color.to_html(false),
+					roundi(ColorGroups.seen_by_all(color, group.background))]
 			row.add_child(swatch)
 		if colors.is_empty():
 			row.add_child(_note("No color found, so its levels get no extra shapes."))

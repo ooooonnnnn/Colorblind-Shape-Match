@@ -256,8 +256,8 @@ func new_level() -> void:
 		level_num += 1
 	effects.clear_star()
 	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups, config.colors))
-	# Extra shapes join the level's own pieces on the board, in colors its
-	# group's type sees as well as anyone (see ExtraShapes). When they count,
+	# Extra shapes join the level's own pieces on the board, in colors every
+	# type of color blindness sees (see ExtraShapes). When they count,
 	# every piece must be placed; when not, only the level's own pieces.
 	var own: int = config.holes * config.shapes
 	var extra_colors: Array[Color] = []
