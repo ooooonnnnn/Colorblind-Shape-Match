@@ -31,6 +31,7 @@ const TUTORIAL_COLOR := Icons.INK
 @onready var content: VBoxContainer = $Content
 @onready var home: ToyButton = $Content/Header/Home
 @onready var star_bar: StarBar = $Content/Header/StarBar
+@onready var star_counter: StarCounter = $Content/Header/Stars
 @onready var testing: PanelContainer = $Content/Header/Testing
 @onready var timer_bar: TimerBar = $Content/TimerBar
 @onready var board: Panel = $Content/Board
@@ -59,7 +60,8 @@ var tutorial := false      # this level is TUTORIAL_LEVEL
 var _tutorial_pending := false  # the tutorial is still to be cleared this game
 var _hand: TutorialHand
 var level_num := 0
-var score := 0
+var score := 0  # levels cleared this run, not counting the tutorial
+var _game_over := false
 var holes: Array[ShapeView] = []
 var pieces: Array[ShapeView] = []
 var selected: ShapeView
@@ -399,6 +401,10 @@ func _clear_board() -> void:
 ## start. The home button pulses to show the way back.
 func end_game() -> void:
 	transitioning = true
+	_game_over = true
+	# Pause has nothing left to pause, so its button becomes the way home.
+	home.picture = "house"
+	home.queue_redraw()
 	var rect := board.get_global_rect()
 	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.5, 0.0, true)
 	effects.confetti(rect, 120)
@@ -429,8 +435,9 @@ func end_level(cleared: bool) -> void:
 		_tutorial_pending = false
 	var delay := 0.7
 	if cleared:
-		# The stars and meter filling, the star's flight, its landing and a moment to enjoy it.
-		delay = Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + 0.9
+		# The stars and meter filling, the star's flight, its landing, a moment
+		# to enjoy it and its trip into the counter.
+		delay = Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + 0.9 + Effects.STORE
 		_cheer()
 	else:
 		whoosh.play()
@@ -453,10 +460,28 @@ func _launch_star(id: int) -> void:
 	if id != _level_id:
 		return
 	var rect := board.get_global_rect()
-	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 0.35, false, star_bar.star_spot())
+	# The tutorial's star isn't counted, so it just shrinks away.
+	var to := Rect2() if tutorial else star_counter.star_spot()
+	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, 0.35, false, star_bar.star_spot(), to)
+	if not tutorial:
+		# After the landing's squash (0.32 s) and the hold, the trip in.
+		get_tree().create_timer(Effects.FLIGHT + 0.32 + 0.35 + Effects.STORE).timeout.connect(_star_stored.bind(id))
 	star_bar.take_star()
 	whoosh.play()
 	get_tree().create_timer(Effects.FLIGHT).timeout.connect(_star_landed.bind(id))
+
+
+## The cheering star has reached the counter: it counts up, with a sparkle and
+## a bling.
+func _star_stored(id: int) -> void:
+	if id != _level_id:
+		return
+	star_counter.add_one()
+	var spot := star_counter.star_spot()
+	effects.burst(spot.get_center(), spot.size.x * 0.5)
+	bling.pitch_scale = 1.5
+	bling.play()
+	_buzz(25)
 
 
 func _star_landed(id: int) -> void:
@@ -494,6 +519,9 @@ func _go_home() -> void:
 ## carry on, the house to go home. Nothing moves meanwhile, the timer
 ## included, and the time away is given back to the timer and the stats.
 func _pause() -> void:
+	if _game_over:
+		_go_home()
+		return
 	if _pause_layer or transitioning:
 		return
 	if drag:

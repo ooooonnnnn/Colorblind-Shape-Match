@@ -14,6 +14,7 @@ const FLIGHT := 0.5   # seconds for a cheering star to fly in from its start (se
 const SWING := 0.35   # how far the flight path bows out to the side, as a fraction of its length
 const STREAM_ARRIVE := 0.3   # seconds before the first streaming stars reach their target
 const STREAM_SPREAD := 0.15  # seconds over which the rest of them leave, so they arrive in a run
+const STORE := 0.4    # seconds for a cheering star to fly off into its counter (see cheer)
 const RAYS := 12          # light rays turning slowly behind a cheering star
 const RAY_TURN := 0.6     # radians per second
 
@@ -105,9 +106,11 @@ func stream_stars(from: Vector2, to: Vector2, spread: float, count := 20) -> voi
 ## A big star that springs into view at center. Given from, the spot of a
 ## smaller star elsewhere on screen (see StarBar.star_spot), it flies from there
 ## instead, swinging out along a curve and spinning as it grows, and lands
-## FLIGHT seconds later. Unless stay is set it shrinks away after hold seconds;
-## with stay it bobs gently until clear() is called.
-func cheer(center: Vector2, side: float, hold := 1.0, stay := false, from := Rect2()) -> void:
+## FLIGHT seconds later. Unless stay is set it leaves after hold seconds:
+## given to, the spot of a star counter, it flies off into it, shrinking to
+## fit, over STORE seconds; otherwise it shrinks away. With stay it bobs
+## gently until clear() is called.
+func cheer(center: Vector2, side: float, hold := 1.0, stay := false, from := Rect2(), to := Rect2()) -> void:
 	clear_star()
 	_star_node = Node2D.new()
 	_star_node.position = center
@@ -131,6 +134,14 @@ func cheer(center: Vector2, side: float, hold := 1.0, stay := false, from := Rec
 			_star_tween.tween_property(_star_node, "position:y", center.y - side * 0.06, 0.8)
 			_star_tween.tween_property(_star_node, "position:y", center.y, 0.8)
 		)
+	elif to.has_area():
+		# Off into the counter, picking up speed, spinning and shrinking to its star's size.
+		_star_tween.tween_interval(hold)
+		_star_tween.tween_property(self, "_rays", 0.0, 0.15)
+		_star_tween.parallel().tween_property(_star_node, "position", to.get_center(), STORE).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		_star_tween.parallel().tween_property(_star_node, "scale", Vector2.ONE * to.size.x / side, STORE).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		_star_tween.parallel().tween_property(_star_node, "rotation", TAU, STORE)
+		_star_tween.tween_callback(clear_star)
 	else:
 		_star_tween.tween_interval(hold)
 		_star_tween.tween_property(_star_node, "scale", Vector2.ZERO, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)

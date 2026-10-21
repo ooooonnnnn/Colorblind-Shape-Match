@@ -3,6 +3,7 @@
 [ext_resource type="Theme" uid="uid://b426jgoyfty6l" path="res://ui_theme.tres" id="0_theme"]
 [ext_resource type="Script" uid="uid://fsp2vy8ki40l" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://bv2qu221uye1x" path="res://scripts/timer_bar.gd" id="2_timer"]
+[ext_resource type="Script" uid="uid://krqkmpkxqlpi" path="res://scripts/star_counter.gd" id="19_counter"]
 [ext_resource type="Script" uid="uid://d3kmfc4fs10uw" path="res://scripts/backdrop.gd" id="18_backdrop"]
 [ext_resource type="AudioStream" uid="uid://d31jia44rl45k" path="res://sounds/uh_uh.mp3" id="4_uh_uh"]
 [ext_resource type="AudioStream" uid="uid://baeehieot3i2d" path="res://sounds/chime.mp3" id="5_chime"]
@@ -98,6 +99,13 @@ size_flags_horizontal = 3
 size_flags_vertical = 4
 mouse_filter = 2
 script = ExtResource("8_stars")
+
+[node name="Stars" type="Control" parent="Content/Header"]
+custom_minimum_size = Vector2(150, 64)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("19_counter")
 
 [node name="Testing" type="PanelContainer" parent="Content/Header"]
 layout_mode = 2
