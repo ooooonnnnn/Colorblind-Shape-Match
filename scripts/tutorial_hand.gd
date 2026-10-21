@@ -2,7 +2,8 @@ class_name TutorialHand
 extends Control
 ## A pointing hand that shows how to play the tutorial level, over and over
 ## until it is freed: it carries a faded copy of the piece into its hole when
-## pieces can be dragged, or taps the piece and then the hole otherwise. Its
+## pieces can be dragged, or otherwise taps the piece, vanishes, and appears
+## over the hole to tap it, so it never looks like a drag. Its
 ## fingertip is at its position, which follows norm_pos on the board.
 
 const FILL := Color.WHITE
@@ -70,8 +71,12 @@ func play(shape: Dictionary, fill: Color, from: Vector2, to: Vector2, drag: bool
 		t.tween_property(self, "press", 0.0, 0.15)
 	else:
 		_tap(t)
-		t.tween_interval(0.35)
-		t.tween_property(self, "norm_pos", to, 0.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		t.tween_interval(0.25)
+		t.tween_property(self, "modulate:a", 0.0, 0.12)
+		t.tween_interval(0.25)
+		t.tween_callback(func(): norm_pos = to)
+		t.tween_property(self, "modulate:a", 1.0, 0.12)
+		t.tween_interval(0.15)
 		_tap(t)
 		t.tween_interval(0.3)
 	t.tween_property(self, "modulate:a", 0.0, 0.3)

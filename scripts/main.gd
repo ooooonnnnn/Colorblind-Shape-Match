@@ -5,7 +5,8 @@ const ColorGroups := preload("res://scripts/color_groups.gd")
 const Stats := preload("res://scripts/stats.gd")
 const GroupPlate := preload("res://scripts/group_plate.gd")
 const CHEER_HOLD := 0.2  # seconds a level's star stays in the middle before flying to the counter
-const PAUSE_LAYER := 120  # above the dots (100) and effects (101), below ColorVision (128)
+const PAUSE_LAYER := 120
+const ANY_KEY_AFTER := 1.5  # seconds into the end of a run before any press goes home, so a last tap doesn't  # above the dots (100) and effects (101), below ColorVision (128)
 const PLAIN_PLATE := {"background": Color("c9ccd3"), "colors": [Color("3b2f4a")]}  # shapes in plain sight, as on the stats screen
 const MIN_LOOK_MS := 10000   # how long a level must have been up before leaving it counts its pieces as missed
 const DRAG_THRESHOLD := 14.0  # px of movement before a press counts as a drag, so a shaky tap stays a tap
@@ -68,6 +69,8 @@ var level_num := 0
 var score := 0  # levels cleared this run, not counting the tutorial
 var _game_over := false
 var _last_cheer := -1  # the jingle played last, see CHEERS
+var _stars_won := 0  # stars earned this run, counting any still on their way to the counter
+var _any_key_home := false  # the run is over and any press now goes home
 var holes: Array[ShapeView] = []
 var pieces: Array[ShapeView] = []
 var selected: ShapeView
@@ -438,9 +441,41 @@ func end_game() -> void:
 	# Every star earned this run pops out of the counter and bounces around
 	# the screen until the player goes home.
 	var spot := star_counter.star_spot()
-	effects.party(spot.get_center(), star_counter.count, spot.size.x * 1.6)
-	for i in mini(star_counter.count, Effects.PARTY_MAX):
+	effects.party(spot.get_center(), _stars_won, spot.size.x * 1.6)
+	for i in mini(_stars_won, Effects.PARTY_MAX):
 		get_tree().create_timer(i * Effects.PARTY_EVERY).timeout.connect(_party_pop.bind(i))
+	get_tree().create_timer(ANY_KEY_AFTER).timeout.connect(_offer_home)
+
+
+## After the end of a run has had a moment, says that any press goes home,
+## and from then on one does (see _input).
+func _offer_home() -> void:
+	_any_key_home = true
+	var layer := CanvasLayer.new()
+	layer.layer = PAUSE_LAYER
+	add_child(layer)
+	var label := Label.new()
+	label.theme = theme
+	label.text = "Press anything to go home"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 52)
+	label.add_theme_color_override("font_outline_color", Color.WHITE)
+	label.add_theme_constant_override("outline_size", 16)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	label.offset_bottom = -70
+	layer.add_child(label)
+	# Fades in, then breathes gently so it is noticed without nagging.
+	label.modulate.a = 0.0
+	var t := label.create_tween()
+	t.tween_property(label, "modulate:a", 1.0, 0.4)
+	t.tween_callback(func():
+		var breathe := label.create_tween().set_loops().set_trans(Tween.TRANS_SINE)
+		breathe.tween_property(label, "modulate:a", 0.55, 0.9)
+		breathe.tween_property(label, "modulate:a", 1.0, 0.9)
+	)
 
 
 ## Cleared levels get a cheering star, confetti and a jingle (see _cheer).
@@ -491,6 +526,7 @@ func _launch_star(id: int) -> void:
 	if id != _level_id:
 		return
 	var rect := board.get_global_rect()
+	_stars_won += 1
 	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, CHEER_HOLD, false, star_bar.star_spot(), star_counter.star_spot())
 	get_tree().create_timer(Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE).timeout.connect(_star_stored.bind(id))
 	star_bar.take_star()
@@ -499,10 +535,9 @@ func _launch_star(id: int) -> void:
 
 
 ## The cheering star has reached the counter: it counts up, with a sparkle and
-## a bling.
-func _star_stored(id: int) -> void:
-	if id != _level_id:
-		return
+## a bling. It counts even if the next level has just begun, as its timer can
+## land a frame late on a slow device.
+func _star_stored(_id: int) -> void:
 	star_counter.add_one()
 	var spot := star_counter.star_spot()
 	effects.burst(spot.get_center(), spot.size.x * 0.5)
@@ -772,6 +807,13 @@ func _add_time(seconds: float) -> void:
 ## Every click starts out stray; the piece, hole or Home button it lands on
 ## claims it in its own input handler, which runs before _penalize_stray.
 func _input(event: InputEvent) -> void:
+	if _any_key_home and event.is_pressed() and not event.is_echo() \
+			and (event is InputEventMouseButton or event is InputEventScreenTouch or event is InputEventKey or event is InputEventJoypadButton):
+		_any_key_home = false
+		get_viewport().set_input_as_handled()
+		_play_pop(1.0)
+		_go_home()
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		_stray_click = true
 		_penalize_stray.call_deferred()
