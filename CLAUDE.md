@@ -103,7 +103,10 @@ holes would not fit across the board.
   `<godot> --headless --path . --export-debug "Android" "builds/android/<name>.apk"`.
   Web, Windows, macOS and Linux export with `--export-release` and their preset
   names into `builds/web`, `builds/windows`, `builds/mac`, `builds/linux`
-  (git-ignored); zip `builds/web` for itch. The Java SDK path must be set in
+  (git-ignored); zip `builds/web` for itch.
+  iOS (`--export-release "iOS" "builds/ios/Shape Match.ipa"`) can only write the
+  Xcode project on Windows (`export_project_only`); build and sign it in Xcode on a
+  Mac. Its Team ID is the placeholder `XXXXXXXXXX`, as Godot won't export without one. The Java SDK path must be set in
   Godot's editor settings for Android.
 - Quick checks, with `<godot>` the console exe:
   - `<godot> --headless --path . --import` after adding a `class_name` script.
