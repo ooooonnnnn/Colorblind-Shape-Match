@@ -118,7 +118,8 @@ calibration belongs to one screen, so it is never written to `res://`.
 All of them read and write through `SettingsFile.read_path` / `write_path`. In
 the editor that's the `res://` file itself, so tuned settings can be committed.
 An exported game can't write `res://`, so it saves to `user://` and reads that
-copy once it exists. The export presets have `include_filter="*.json, phone.html"` so the
+copy once it exists. The export presets have `include_filter="*.json, calibration/phone.html, calibration/meter.apk"` (filters match
+the whole path) so the
 files (and the calibration phone page) are packed at all. Android needs the
 `internet` permission for the calibration server.
 
