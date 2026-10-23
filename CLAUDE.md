@@ -24,8 +24,9 @@ show only through hue, so a player with the matching deficiency can't see them.
   (grown-up settings), `stats.tscn`, `references.tscn`.
 - `scripts/main.gd`: the game: levels, input (drag and tap-tap), timer, stats.
 - `scripts/config.gd`: the settings page, in tabs Levels (sequence cards, each
-  edited in a pop-up), Playing, Dots, Colors, with the color blind view beside
-  the preview; nothing is written until Save, and leaving unsaved asks first.
+  edited in a pop-up), Playing, Dots, Colors, Calibration, with the color blind
+  view beside the preview; nothing is written until Save, and leaving unsaved
+  asks first.
 - `scripts/popup_card.gd`, `info_button.gd`, `toy_switch.gd`: the pop-up window,
   the round "?" that opens an explanation, and the on/off switch both grown-up
   screens use. Pop-ups sit on their own CanvasLayer (110), above the dots.
@@ -33,6 +34,54 @@ show only through hue, so a player with the matching deficiency can't see them.
   (a CanvasLayer that repacks circles around the tray and reads screen colors).
 - `scripts/color_groups.gd`: protan/deutan/tritan confusion-color groups.
 - `scripts/color_vision.gd`: autoload that simulates color blindness on screen.
+- Screen calibration (from "Color calibration using a phone camera.pdf" in
+  Downloads): `scripts/display_calibration.gd`, autoload `DisplayCalibration`
+  (layer 128, after ColorVision so it draws last), runs every pixel through a
+  32³ LUT packed in a 1024x32 texture (`shaders/display_calibration.gdshader`),
+  baked from per-channel curves (codes for 25/50/75% light), a gamut matrix and
+  an eye tint. `scripts/calibration_screen.gd` is the full-screen wizard
+  (layer 120), with pictures from `scripts/calibration_art.gd`: by eye, only taps
+  (the user found sliders and squinting too hard): the square hardest to see in
+  1px gray stripes (`shaders/calibration_pattern.gdshader`, real pixels via
+  FRAGCOORD) sets gamma, then "tap the grayest of 9 tinted grays" at 50/75/25%
+  sets the channel balance, 3 narrowing rounds each; or
+  with a phone, where `scripts/calibration_link.gd` serves
+  `calibration/phone.html` over HTTPS (self-signed cert in `user://`) behind a
+  QR code (`scripts/qr_code.gd`), and `scripts/camera_calibration.gd` plans the
+  patches. Curves come from split patches, a solid circle in 1px stripes, the
+  phone comparing the middle and a ring of one frame (so auto exposure can't
+  skew it; a plain patch per search first measures lens shading), read from
+  WebCodecs frames where it can. With manual exposure and white balance it
+  also probes white/R/G/B and turns exposure down until none clips, then
+  camera linearization from the gray matches, primaries with white point
+  preservation, white to D65 if the phone locks 6500 K, and ΔE00 before/after.
+  Impossible results (matches off their range, gammas outside 1.6-3.0) are
+  marked untrusted and not applied. Each run's readings go to
+  `user://calibration_log.json`, and a copy per run in `user://calibration_logs/`
+  (in `%APPDATA%/Godot/app_userdata/Shape Match`).
+  While lining up, the circle can be dragged (so the phone can rest on the desk)
+  and the phone posts `/aim` with where it sees the circle's edge, so the PC
+  resizes it; both are kept in `user://calibration.cfg`. The phone refuses to
+  start while it sees the stripes sharply (resolved stripes clip and read low).
+- Shape Match Meter (`calibration/meter`, Java with only framework classes):
+  an Android app reading Camera2 RAW_SENSOR data under manual exposure, focus at
+  infinity. The page offers it on Android through an `intent://` link (scheme
+  `shapematch-meter`) whose fallback downloads `calibration/meter.apk` from the
+  game's server. With it the game uses `scripts/raw_calibration.gd`: levels
+  as a disc on a white screen (no stripes), each scaled by the white around it
+  in the same picture (the user's screen read far too flat with full-screen
+  patches: it dims and brightens with its content), raw straightened by a
+  bracket of exposure times on white, and curves balanced on a gray ramp so
+  each gray is, in raw camera colors, a dimmer copy of the white (no color
+  matrix needed). The camera's matrix proved unfit for a screen's colors (it
+  put the white far off, and R+G+B came to 116% of white), so gamut and white
+  point are left alone; the matrix only scores ΔE00 against the screen's own
+  white, grays reported apart. Eye runs are logged too. The app shows the raw picture to
+  line up the disc (dragged on the PC, sized from the app's `/aim`); the game
+  answers `/hello` with `METER_VERSION` (`calibration_link.gd`, keep it equal
+  to `android:versionCode`) and an older app offers its update. Rebuild the APK with
+  `sh calibration/meter/build.sh` (javac, d8, aapt2, zipalign, apksigner; no
+  Gradle) after changing it; the built APK is committed.
 - `scripts/extra_shapes.gd`: control pieces in colors the group's type sees.
 - `scripts/stats.gd`, `scripts/stats_screen.gd`, `scripts/xlsx_writer.gd`: per-piece
   records in `user://stats.json`, the reading of them, and the Excel export.
@@ -47,11 +96,15 @@ JSON at the project root, each with a loader and saver in its script:
 `color_vision.json` (`ColorVision`), `extra_shapes.json` (`ExtraShapes`),
 `play.json` (`PlaySettings`: `drag`, `tutorial`).
 
+The exception is `user://display_calibration.json` (`DisplayCalibration`): a
+calibration belongs to one screen, so it is never written to `res://`.
+
 All of them read and write through `SettingsFile.read_path` / `write_path`. In
 the editor that's the `res://` file itself, so tuned settings can be committed.
 An exported game can't write `res://`, so it saves to `user://` and reads that
-copy once it exists. The export presets have `include_filter="*.json"` so the
-files are packed at all.
+copy once it exists. The export presets have `include_filter="*.json, phone.html"` so the
+files (and the calibration phone page) are packed at all. Android needs the
+`internet` permission for the calibration server.
 
 ## Features added so far (Oct 2026)
 

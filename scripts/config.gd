@@ -1,8 +1,9 @@
 extends Control
-## The grown-up settings, in four tabs by what they are for: Levels (the level
+## The grown-up settings, in five tabs by what they are for: Levels (the level
 ## sequences, LevelConfig), Playing (dragging, the tutorial and shape size),
-## Dots (the dot filter, dots.json and noise.json, and the outline) and Colors
-## (the color groups, ColorGroups, and extra shapes). Beside them, the preview
+## Dots (the dot filter, dots.json and noise.json, and the outline), Colors
+## (the color groups, ColorGroups, and extra shapes) and Calibration (this
+## screen's color calibration, DisplayCalibration). Beside them, the preview
 ## shows the dots, colors and shapes live, with the color group last chosen or
 ## edited, and can show it all through color blind eyes (ColorVision). Nothing
 ## is written until Save; leaving with unsaved changes asks first.
@@ -42,6 +43,7 @@ const ABOUT_FADE_IN := "The first time the dots come on in a game, the shapes sh
 const ABOUT_BOARD := "The color between the dots and on the board, like the paper of a printed plate. It is the same around every dot, so it never gives a shape away."
 const ABOUT_GROUPS := "Each group is made for one type of color blindness: its piece colors blend into its background for that type. The level sequences use these groups.\n\nThe bar under each piece color shows whether it really blends in for that type: green blends in, orange may be spotted."
 const ABOUT_EXTRA_COLORS := "Extra shapes take colors from a fixed set (near-black, navy, dark red, charcoal, yellow and white) that stand apart from the backgrounds by lightness, which every type of color blindness still sees. So they never vanish, whoever plays.\n\nThis sets how different they must look from the background to every type and to normal vision, as a CIELAB distance: around 10 is subtle, 40 and up is plain to see, and about 50 is the most the set reaches. How many each level has is set per sequence."
+const ABOUT_CALIBRATION := "Screens don't all show a color the same way: many make colors more vivid, bluer or brighter in the middle tones than the standard (sRGB) the game's colors are picked in. A color vision test hangs on small color differences, so a screen that shifts them can hide a color blind player's difficulty, or invent one.\n\nCalibrating measures this screen and corrects every color the game draws to make up for it. Phones and tablets don't let apps change the screen itself, so the game does it, on top of everything it shows.\n\nBy eye: you tap a few squares, the one hardest to see and the grayest grays, which sets the screen's brightness curve (gamma) and its gray balance. It can't measure the screen's color range or exact white.\n\nWith a phone camera: another phone measures the screen. Best is the Shape Match Meter app on Android, offered by the page the code opens: it reads the camera's raw sensor data, before the phone's picture processing, and measures the brightness curves, the color range and the white point directly, as color scientists do. Without it, the phone's browser measures: it finds the brightness curves by matching stripes, then, where the phone's browser can fix its camera's settings, the color range and white point too, and checks the game's colors before and after. Errors are given as ΔE00: under 1 can't be seen, up to 2 suits vision tests, over 3 is plain to see.\n\nA calibration belongs to one screen, so it is kept on this device only, not in the shared settings. Calibrate each device the game is played on, and again after changing its brightness or color mode."
 const ABOUT_VISION := "Shows the whole page as someone with that type of color blindness sees it, to check that a color group really hides its shapes. It stays on in the game too until set back to normal vision.\n\nStrength: many color blind people still have weakened cones of the missing type, so they see some of the difference. 100% is the full form."
 
 @onready var tabs: TabContainer = %Tabs
@@ -49,6 +51,7 @@ const ABOUT_VISION := "Shows the whole page as someone with that type of color b
 @onready var playing_page: VBoxContainer = %PlayingPage
 @onready var dots_page: VBoxContainer = %DotsPage
 @onready var colors_page: VBoxContainer = %ColorsPage
+@onready var calibration_page: VBoxContainer = %CalibrationPage
 @onready var back: ToyButton = %Back
 @onready var save: Button = %Save
 @onready var saved_note: Label = %SavedNote
@@ -88,6 +91,10 @@ var _clean := ""  # the settings as last loaded or saved, see _state
 var _dirty := false
 var _check_in := 0.0
 var _reorder := {}  # {row, pointer} while a sequence card is being dragged to a new place
+var _calibration_status := Label.new()
+var _calibration_switch: ToySwitch
+var _calibration_forget := Button.new()
+var _calibrating: CalibrationScreen  # the open calibration steps, or null
 
 
 func _ready() -> void:
@@ -95,12 +102,14 @@ func _ready() -> void:
 	PlaySettings.load_settings()  # the Levels tab shows the tutorial from it
 	var drag_scroll := DragScroll.new()  # drag anywhere on a tab, or in a pop-up, to scroll it
 	drag_scroll.target = func():
+		if is_instance_valid(_calibrating):
+			return null  # its sliders and buttons take every press
 		if is_instance_valid(_popup):
 			return _popup.scroll()
 		return tabs.get_current_tab_control() as ScrollContainer
 	add_child(drag_scroll)
 	for i in tabs.get_tab_count():
-		tabs.set_tab_title(i, ["Levels", "Playing", "Dots", "Colors"][i])
+		tabs.set_tab_title(i, ["Levels", "Playing", "Dots", "Colors", "Calibration"][i])
 	tabs.add_theme_font_size_override("font_size", 24)
 	_build_levels_page()
 	# Dots has loaded its settings by now, as children are ready first.
@@ -111,6 +120,7 @@ func _ready() -> void:
 	preview.resized.connect(_layout_preview)
 	_build_colors_page()
 	_build_vision_controls()
+	_build_calibration_page()
 	back.activated.connect(_on_back)
 	save.pressed.connect(_save)
 	resized.connect(_fit_columns)
@@ -1064,6 +1074,87 @@ func _update_cards() -> void:
 					"it blends in, on their confusion line" if matches else "off their confusion line, so they may spot it"]
 
 
+# ---------- Calibration ----------
+
+func _build_calibration_page() -> void:
+	_intro(calibration_page, "Correct this screen's colors so the color groups show as designed. Kept on this device only.", "Calibrating the screen", ABOUT_CALIBRATION)
+	var status := _card(calibration_page, "This screen")
+	_calibration_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_calibration_status.add_theme_font_size_override("font_size", 20)
+	status.add_child(_calibration_status)
+	_calibration_switch = _switch("Use the calibration", DisplayCalibration.enabled)
+	_calibration_switch.toggled.connect(func(on): DisplayCalibration.enabled = on)
+	_calibration_forget.text = "Forget it"
+	PopupCard.tint(_calibration_forget, REMOVE)
+	_calibration_forget.pressed.connect(func():
+		PopupCard.confirm(self, "Forget the calibration?", "The game will show its colors as they are on this screen. It's gone for good once you save.",
+				"Forget it", _forget_calibration, "Cancel", true)
+	)
+	status.add_child(_row([_calibration_switch, _calibration_forget]))
+
+	var eye := _card(calibration_page, "By eye", "About two minutes, just tapping: the square that's hardest to see, then the grayest grays.")
+	var eye_start := Button.new()
+	eye_start.text = "Calibrate by eye"
+	eye_start.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	eye_start.pressed.connect(_calibrate.bind("eye"))
+	eye.add_child(eye_start)
+
+	var camera := _card(calibration_page, "With a phone camera", "About two minutes. Another phone measures this screen. On Android, the page it opens offers the small Meter app, which reads the camera's raw data and measures best. Both must be on the same Wi-Fi.")
+	var camera_start := Button.new()
+	camera_start.text = "Calibrate with a phone"
+	camera_start.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	camera_start.pressed.connect(_calibrate.bind("camera"))
+	camera.add_child(camera_start)
+	if not CalibrationLink.supported():
+		camera_start.disabled = true
+		camera.add_child(_note("Not in the browser version: a web page can't serve the phone. Use the app, or calibrate by eye."))
+
+	var before := _card(calibration_page, "Before you start", "Set the screen up as it will be played on:")
+	before.add_child(CalibrationArt.tiles(CalibrationScreen.BEFORE_YOU_START, Vector2(150, 105), 16))
+	_refresh_calibration()
+
+
+func _calibrate(how: String) -> void:
+	if is_instance_valid(_calibrating):
+		return
+	_calibrating = CalibrationScreen.open(self, how)
+	_calibrating.finished.connect(func(_result): _refresh_calibration())
+
+
+func _forget_calibration() -> void:
+	DisplayCalibration.clear()
+	_refresh_calibration()
+
+
+## What the calibration in use is, in words.
+func _refresh_calibration() -> void:
+	_calibration_switch.set_on(DisplayCalibration.enabled)
+	_calibration_switch.disabled = not DisplayCalibration.is_calibrated()
+	_calibration_forget.disabled = not DisplayCalibration.is_calibrated()
+	if not DisplayCalibration.is_calibrated():
+		_calibration_status.text = "Not calibrated: the game sends its colors to the screen as they are."
+		return
+	var notes := DisplayCalibration.notes
+	var lines: Array[String] = ["Calibrated %s on %s." % ["by eye" if DisplayCalibration.method == "eye" else "with a phone camera",
+			DisplayCalibration.date.get_slice("T", 0)]]
+	var g: Dictionary = notes.get("gammas", {})
+	if g.has("r"):
+		lines.append("Gamma: red %.2f, green %.2f, blue %.2f (standard is about 2.2)." % [g.r, g.g, g.b])
+	var also: Array[String] = []
+	if notes.get("gamut_used", false):
+		also.append("color range")
+	if notes.get("white_used", false):
+		also.append("white point")
+	if not also.is_empty():
+		lines.append("Also corrects its %s." % " and ".join(also))
+	if notes.has("after_grays"):
+		# The camera judges grays well and bright colors only roughly (see RawCalibration).
+		lines.append("Gray error after: average %.1f, worst %.1f ΔE00, %s." % [notes.after_grays.mean, notes.after_grays.max, DisplayCalibration.tier(notes.after_grays.max)])
+	elif notes.has("after"):
+		lines.append("Color error after: average %.1f, worst %.1f ΔE00, %s." % [notes.after.mean, notes.after.max, DisplayCalibration.tier(notes.after.max)])
+	_calibration_status.text = "\n".join(lines)
+
+
 # ---------- Preview ----------
 
 ## Under the preview's title: buttons to see it all as each type of color
@@ -1176,7 +1267,7 @@ func _fit_columns() -> void:
 func _state() -> String:
 	return var_to_str([_levels(), dots.max_radius, dots.gap, dots.fill, dots.board_color, dots.noise, _groups,
 			ShapeView.side_fraction, ShapeView.outline_percent, ExtraShapes.difference,
-			ColorVision.mode, ColorVision.severity, PlaySettings.drag, PlaySettings.tutorial, PlaySettings.landscape, PlaySettings.fade_in, PlaySettings.endless_extra,
+			ColorVision.mode, ColorVision.severity, DisplayCalibration.state(), PlaySettings.drag, PlaySettings.tutorial, PlaySettings.landscape, PlaySettings.fade_in, PlaySettings.endless_extra,
 			PlaySettings.extra_delay, PlaySettings.extra_stop])
 
 
@@ -1218,6 +1309,7 @@ func _on_back() -> void:
 
 func _leave() -> void:
 	ColorVision.load_settings()  # leave unsaved changes behind
+	DisplayCalibration.load_settings()
 	PlaySettings.load_settings()
 	await get_tree().create_timer(0.15).timeout  # let the button's pop play
 	get_tree().change_scene_to_file("res://menu.tscn")
@@ -1226,7 +1318,7 @@ func _leave() -> void:
 ## Writes every settings file; returns whether all of them were written.
 func _save() -> bool:
 	var failed := false
-	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size(), ExtraShapes.save_settings(), ColorVision.save_settings(), PlaySettings.save_settings()]:
+	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size(), ExtraShapes.save_settings(), ColorVision.save_settings(), DisplayCalibration.save_settings(), PlaySettings.save_settings()]:
 		if result != OK:
 			failed = true
 			push_error("Could not save config: %s" % error_string(result))

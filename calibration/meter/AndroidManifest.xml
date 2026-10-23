@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	Shape Match Meter: measures a screen with the phone camera's raw sensor
+	data for Shape Match's screen calibration. Built by calibration/meter/build.sh
+	into calibration/meter.apk, which the game serves to the phone. Opened from
+	the calibration web page with shapematch-meter://connect?u=<address>&s=<session>.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+	package="com.shapematch.meter"
+	android:versionCode="4"
+	android:versionName="1.3">
+
+	<uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35" />
+	<uses-permission android:name="android.permission.CAMERA" />
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-feature android:name="android.hardware.camera" android:required="true" />
+
+	<application
+		android:label="Shape Match Meter"
+		android:allowBackup="false">
+		<activity
+			android:name=".MeterActivity"
+			android:exported="true"
+			android:launchMode="singleTask"
+			android:screenOrientation="portrait"
+			android:configChanges="orientation|screenSize|keyboardHidden"
+			android:theme="@android:style/Theme.Material.Light.NoActionBar">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data android:scheme="shapematch-meter" />
+			</intent-filter>
+		</activity>
+	</application>
+</manifest>
