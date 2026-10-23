@@ -62,6 +62,7 @@ var _circles := MultiMeshInstance2D.new()
 var _packed_in := Rect2()   # the area rect the circles were packed into
 var _packed_for := Rect2()  # the mask rect the circles were packed around
 var _shown_colors := PackedColorArray()  # the base colors last given to the shader
+var _fade: Tween
 
 
 func _ready() -> void:
@@ -179,6 +180,22 @@ func save_noise() -> Error:
 			}
 	file.store_string(JSON.stringify(data, "\t", false) + "\n")
 	return OK
+
+
+## Lets the shapes show plainly at first, then covers them with the dots over
+## seconds. The circles still follow the screen all along, so they settle on
+## the shapes as they come in.
+func fade_in(seconds: float) -> void:
+	if _fade:
+		_fade.kill()
+	_set_opacity(0.0)
+	_fade = create_tween()
+	_fade.tween_method(_set_opacity, 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+func _set_opacity(opacity: float) -> void:
+	_background.material.set_shader_parameter("opacity", opacity)
+	_circles.material.set_shader_parameter("opacity", opacity)
 
 
 ## Takes a color group's background and figure colors (see ColorGroups), and

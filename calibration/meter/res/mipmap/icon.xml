@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Before Android 8 (no adaptive icons): the shapes on a round sky. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+	<item>
+		<shape android:shape="oval">
+			<solid android:color="@color/sky" />
+		</shape>
+	</item>
+	<item android:drawable="@drawable/icon_shapes" />
+</layer-list>

@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shape Match: measure the screen</title>
+<!--
+	Served by Shape Match (scripts/calibration_link.gd) to the phone that
+	measures the screen. The phone is only a light meter: from each picture it
+	averages the middle and a ring around it, and posts both; the game answers
+	with the next patch to show, and asks for less exposure when a patch was
+	too bright to record. See scripts/camera_calibration.gd.
+
+	The screen shows a solid circle in stripes; the middle sees the circle and
+	the ring sees the stripes, in the same frame, so the two compare alike
+	whatever the camera's automatic exposure does. The dashed guide rings show
+	where the circle's edge must fall, between the two.
+
+	Where the browser allows (Chrome on Android), the camera's own frames are
+	read with WebCodecs, as they come from the camera, and their YUV turned
+	into light here, rather than reading the video as the browser draws it,
+	which is scaled, color managed and rounded first. Elsewhere the drawn video
+	is read. A browser never gets the sensor's raw data.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&display=swap">
+<style>
+	:root { --ink: #3b2f4a; --soft: #3b2f4aaa; --paper: #fffaf0; --sky: #bfe5ff; --go: #7bd88f; --sun: #ffd166; --pink: #ffb4a2; --link: #1f5fa8; --no: #e05a47; }
+	* { box-sizing: border-box; }
+	body { margin: 0; padding: 16px; font: 600 17px/1.45 Nunito, "Arial Rounded MT Bold", system-ui, sans-serif; color: var(--ink);
+		background: linear-gradient(#cfeaff, #fff6e0) fixed; min-height: 100vh; }
+	main { max-width: 540px; margin: 0 auto; }
+	header { display: flex; align-items: center; gap: 10px; margin: 2px 4px 14px; }
+	header svg { flex: none; }
+	header small { display: block; font-size: 14px; color: var(--soft); }
+	h1 { font-size: 26px; font-weight: 900; margin: 0; line-height: 1.1; }
+	h2 { font-size: 21px; font-weight: 900; margin: 0 0 6px; }
+	.card { background: var(--paper); border: 2.5px solid var(--ink); border-radius: 24px; padding: 18px; margin: 0 0 14px; box-shadow: 0 4px 0 #3b2f4a22; }
+	.card.best { background: #fff; }
+	.tag { display: inline-block; background: var(--sun); border: 2px solid var(--ink); border-radius: 12px; padding: 1px 10px; font-size: 14px; font-weight: 800; margin-bottom: 8px; }
+	.steps { list-style: none; padding: 0; margin: 12px 0 4px; counter-reset: n; }
+	.steps li { display: flex; gap: 12px; align-items: center; margin: 10px 0; }
+	.steps li::before { counter-increment: n; content: counter(n); flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--sun);
+		border: 2px solid var(--ink); display: grid; place-items: center; font-weight: 900; }
+	.steps svg { flex: none; width: 84px; height: 60px; background: #fff; border: 2px solid #3b2f4a33; border-radius: 12px; }
+	.steps b { display: block; font-weight: 800; }
+	details { margin: 0 0 14px; }
+	summary { list-style: none; cursor: pointer; text-align: center; color: var(--link); font-weight: 800; padding: 8px; }
+	summary::-webkit-details-marker { display: none; }
+	details[open] summary { display: none; }
+	#view { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #2c2a3a; border: 2.5px solid var(--ink); border-radius: 20px; overflow: hidden; margin: 6px 0 10px; }
+	video { width: 100%; height: 100%; object-fit: fill; }
+	#guide { position: absolute; inset: 0; width: 100%; height: 100%; }
+	#chip { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 16px; background: #fff; border: 2px solid #3b2f4a33; font-weight: 800; min-height: 56px; }
+	#chip .dot { flex: none; width: 18px; height: 18px; border-radius: 50%; background: #ccc; border: 2px solid var(--ink); }
+	.button, button { display: block; text-align: center; text-decoration: none; font: inherit; font-weight: 900; font-size: 19px; width: 100%; padding: 15px; margin: 12px 0 6px;
+		border: 2.5px solid var(--ink); border-radius: 18px; background: var(--go); color: var(--ink); box-shadow: 0 4px 0 var(--ink); cursor: pointer; }
+	.button:active, button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+	button.quiet { background: #fff; }
+	button:disabled { opacity: 0.4; }
+	#ring { display: block; margin: 8px auto; }
+	.center { text-align: center; }
+	.small { font-size: 14px; color: var(--soft); }
+	.warn { color: #b0402f; font-weight: 800; }
+	a { color: var(--link); }
+	[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+	<header>
+		<svg width="74" height="34" viewBox="0 0 74 34"><circle cx="12" cy="17" r="10" fill="#ffb4a2" stroke="#3b2f4a" stroke-width="2"/>
+			<path d="M37 5 L40.2 12.4 L48.2 13.2 L42.2 18.6 L43.9 26.5 L37 22.4 L30.1 26.5 L31.8 18.6 L25.8 13.2 L33.8 12.4 Z" fill="#ffd166" stroke="#3b2f4a" stroke-width="2" stroke-linejoin="round"/>
+			<rect x="53" y="8" width="18" height="18" rx="4" fill="#7bd88f" stroke="#3b2f4a" stroke-width="2"/></svg>
+		<div><small>Shape Match</small><h1>Measure your screen</h1></div>
+	</header>
+
+	<section id="meter" class="card best" hidden>
+		<span class="tag">Best on Android</span>
+		<h2>The Shape Match Meter app</h2>
+		<div>It reads the camera's raw sensor data, so the phone's picture processing can't spoil the measuring, and it talks you through every step.</div>
+		<ol class="steps">
+			<li><svg viewBox="0 0 84 60"><rect x="26" y="4" width="32" height="52" rx="6" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><rect x="30" y="10" width="24" height="40" fill="#fffaf0"/><path d="M42 18 v16 M35 28 l7 7 l7 -7" stroke="#3b2f4a" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 42 h16" stroke="#7bd88f" stroke-width="4" stroke-linecap="round"/></svg>
+				<div><b>Get the app</b>Tap the button below. It comes from your computer (about 330 KB).</div></li>
+			<li><svg viewBox="0 0 84 60"><rect x="26" y="4" width="32" height="52" rx="6" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><rect x="30" y="10" width="24" height="40" fill="#fffaf0"/><rect x="34" y="34" width="16" height="9" rx="4" fill="#7bd88f" stroke="#3b2f4a" stroke-width="1.5"/><path d="M36 17 h12 M36 23 h9" stroke="#3b2f4a55" stroke-width="3" stroke-linecap="round"/></svg>
+				<div><b>Install it</b>Open the download. If the phone asks, allow installing from this browser.</div></li>
+			<li><svg viewBox="0 0 84 60"><rect x="4" y="10" width="40" height="34" rx="4" fill="#2c2a3a" stroke="#3b2f4a" stroke-width="2"/><rect x="15" y="17" width="18" height="18" fill="#fff"/><path d="M17 19 h5 v5 h-5z M26 19 h5 v5 h-5z M17 28 h5 v5 h-5z" fill="#3b2f4a"/><rect x="56" y="6" width="22" height="42" rx="5" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><path d="M56 26 L33 18 L33 34 Z" fill="#ffd16677"/></svg>
+				<div><b>Scan the code again, in the app</b>Or come back here and tap the button again: it opens the app already connected.</div></li>
+		</ol>
+		<a id="open-meter" class="button">Get or open the Meter app</a>
+		<p class="small center"><a id="get-meter">Download the app again</a></p>
+	</section>
+
+	<details id="web" open>
+		<summary>No Android, or can't install apps? Measure with this page instead</summary>
+		<section id="intro" class="card">
+			<h2>Measure with this page</h2>
+			<ol class="steps">
+				<li><svg viewBox="0 0 92 66"><rect x="52" y="10" width="34" height="48" rx="5" fill="#2c2a3a" stroke="#3b2f4a" stroke-width="2"/><path d="M12 14 L22 2 L32 14 Z" fill="#f4a933" stroke="#3b2f4a" stroke-width="2"/><path d="M28 20 L50 30 M28 28 L50 42" stroke="#ffd166" stroke-width="4"/><path d="M14 54 L48 6" stroke="#e05a47" stroke-width="6" stroke-linecap="round"/></svg>
+					<div><b>Dim the room</b>No lamp or window shining on the screen.</div></li>
+				<li><svg viewBox="0 0 92 66"><rect x="14" y="4" width="8" height="54" rx="2" fill="#2c2a3a"/><path d="M60 31 L22 16 L22 46 Z" fill="#ffd16677"/><rect x="60" y="12" width="7" height="40" rx="2" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><path d="M22 62 L60 62" stroke="#3b2f4a" stroke-width="2"/><text x="41" y="58" font-size="11" text-anchor="middle" fill="#3b2f4a">close</text></svg>
+					<div><b>Hold it close</b>Camera facing the screen, straight on. A little blurry is good.</div></li>
+				<li><svg viewBox="0 0 92 66"><rect x="28" y="2" width="36" height="62" rx="6" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><rect x="32" y="8" width="28" height="48" fill="#808080"/><circle cx="46" cy="32" r="9" fill="#e6e6e6"/><circle cx="46" cy="32" r="6" fill="none" stroke="#4caf7a" stroke-width="1.5" stroke-dasharray="2 2"/><circle cx="46" cy="32" r="12" fill="none" stroke="#4caf7a" stroke-width="1.5" stroke-dasharray="2 2"/></svg>
+					<div><b>Circle between the rings</b>Move until the bright circle's edge sits between the dashed rings and they turn green.</div></li>
+				<li><svg viewBox="0 0 92 66"><circle cx="46" cy="33" r="26" fill="#fff" stroke="#3b2f4a" stroke-width="2"/><path d="M46 33 L46 13 M46 33 L60 38" stroke="#3b2f4a" stroke-width="4" stroke-linecap="round"/><path d="M46 7 A26 26 0 0 1 72 33" fill="none" stroke="#4caf7a" stroke-width="6"/></svg>
+					<div><b>Keep still</b>About two minutes. Resting the phone on something helps.</div></li>
+			</ol>
+			<button id="camera">Turn on the camera</button>
+		</section>
+	</details>
+
+	<section id="aim" class="card" hidden>
+		<h2>Line up</h2>
+		<div id="view"><video id="video" playsinline muted></video>
+			<svg id="guide" viewBox="0 0 100 100" preserveAspectRatio="none">
+				<ellipse id="near" fill="none" stroke-width="0.8" stroke-dasharray="2 1.5"/>
+				<ellipse id="far" fill="none" stroke-width="0.8" stroke-dasharray="2 1.5"/>
+			</svg></div>
+		<div id="chip"><span class="dot" id="light"></span><span id="advice">Point the camera at the screen.</span></div>
+		<button id="start">Start measuring</button>
+		<p class="small" id="source"></p>
+	</section>
+
+	<section id="run" class="card center" hidden>
+		<h2>Measuring</h2>
+		<svg id="ring" width="170" height="170" viewBox="0 0 170 170">
+			<circle cx="85" cy="85" r="70" fill="none" stroke="#3b2f4a22" stroke-width="16"/>
+			<circle id="arc" cx="85" cy="85" r="70" fill="none" stroke="#7bd88f" stroke-width="16" stroke-linecap="round"
+				stroke-dasharray="0 440" transform="rotate(-90 85 85)"/>
+			<text id="percent" x="85" y="95" font-size="34" font-weight="900" text-anchor="middle" fill="#3b2f4a">0%</text>
+		</svg>
+		<p id="status"><b>Measuring.</b> Keep the phone still.</p>
+	</section>
+
+	<section id="end" class="card center" hidden>
+		<svg width="110" height="110" viewBox="0 0 110 110"><circle cx="55" cy="55" r="50" fill="#7bd88f" stroke="#3b2f4a" stroke-width="3"/><path d="M30 56 L48 74 L82 38" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+		<h2>All done!</h2>
+		<p id="done"></p>
+		<button id="again" class="quiet">Measure again</button>
+		<p class="small">To measure again, tap Try again on the computer first.</p>
+	</section>
+	<p id="error" class="card warn" hidden></p>
+	<canvas id="canvas" hidden></canvas>
+</main>
+<script>
+"use strict";
+const token = new URLSearchParams(location.search).get("s") || "";
+const $ = (id) => document.getElementById(id);
+const video = $("video");
+const canvas = $("canvas");
+const context = canvas.getContext("2d", { willReadFrequently: true });
+// Where things are measured, as shares of half the picture's shorter side
+// from its middle: the circle's middle, and the ring of stripes around it.
+// The circle's edge must fall between EDGE_NEAR and EDGE_FAR.
+const INNER = 0.25, OUTER = [0.75, 0.95], EDGE_NEAR = 0.35, EDGE_FAR = 0.65;
+const BINS = 20;  // rings the brightness is profiled in, to find the circle's edge
+const STEP = 2;  // every other pixel each way is plenty for an average
+const CLIP_LIMIT = 0.003;  // share of pixels at the top, as camera_calibration.gd
+const SHARP = 0.12;  // stripes this sharp (neighbor difference over level) the camera can resolve, which skews the average
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+// On Android, the Meter app: opened with the game's address and this session,
+// or, when it isn't installed yet, downloaded from the game.
+if (/Android/i.test(navigator.userAgent)) {
+	const download = `${location.origin}/meter.apk?s=${encodeURIComponent(token)}`;
+	$("open-meter").href = `intent://connect?u=${encodeURIComponent(location.origin)}&s=${encodeURIComponent(token)}`
+		+ `#Intent;scheme=shapematch-meter;package=com.shapematch.meter;S.browser_fallback_url=${encodeURIComponent(download)};end`;
+	$("get-meter").href = download;
+	$("meter").hidden = false;
+	$("web").open = false;
+}
+
+let track = null;
+let caps = {};
+let reader = null;  // the camera's own frames, when the browser gives them
+let waiting = [];  // who wants the next frame
+let measuring = false;
+let stuck = false;  // the camera can't be turned down any further
+let locked = null;  // what lock() fixed, kept for later runs
+const exposure = { manual: false, time: null, iso: null, comp: null };
+let frameInfo = null;  // the first camera frame's format and color space, for the game's log
+
+// Video codes to light: sRGB for drawn video, BT.709's curve for camera
+// frames that say so (as most do).
+function curve(transfer) {
+	const table = new Float32Array(1025);
+	for (let i = 0; i <= 1024; i++) {
+		const v = i / 1024;
+		if (transfer === "linear") table[i] = v;
+		else if (transfer === "bt709" || transfer === "smpte170m") table[i] = v < 0.081 ? v / 4.5 : Math.pow((v + 0.099) / 1.099, 1 / 0.45);
+		else table[i] = v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+	}
+	return table;
+}
+const curves = {};
+const decode = (table, v) => table[Math.round(Math.min(Math.max(v, 0), 1) * 1024)];
+
+function fail(text) {
+	$("error").textContent = text;
+	$("error").hidden = false;
+}
+
+async function post(path, data) {
+	for (let attempt = 0; ; attempt++) {
+		try {
+			const reply = await fetch(path + "?s=" + encodeURIComponent(token), {
+				method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+			});
+			if (reply.status === 403) throw new Error(await reply.text());
+			return await reply.json();
+		} catch (error) {
+			if (attempt >= 4 || String(error.message).startsWith("This calibration")) throw error;
+			await sleep(500);
+		}
+	}
+}
+
+// Applies camera settings; returns whether the camera took them. Browsers
+// skip settings they can't apply without an error, so the modes are read back.
+async function constrain(settings) {
+	try {
+		await track.applyConstraints({ advanced: [settings] });
+	} catch (error) {
+		return false;
+	}
+	const now = track.getSettings();
+	return Object.entries(settings).every(([key, value]) => typeof value !== "string" || now[key] === value);
+}
+
+const supports = (name, value) => Array.isArray(caps[name]) ? caps[name].includes(value) : caps[name] !== undefined;
+
+$("camera").onclick = async () => {
+	if (!window.isSecureContext || !navigator.mediaDevices) {
+		fail("This browser won't let the page use the camera. Open the page in Chrome or Safari, from the code on the screen.");
+		return;
+	}
+	try {
+		const stream = await navigator.mediaDevices.getUserMedia({
+			video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
+		});
+		video.srcObject = stream;
+		await video.play();
+		track = stream.getVideoTracks()[0];
+		caps = track.getCapabilities ? track.getCapabilities() : {};
+	} catch (error) {
+		fail("The camera didn't turn on: " + error.message);
+		return;
+	}
+	$("view").style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+	drawGuide();
+	if ("MediaStreamTrackProcessor" in window) {
+		try {
+			reader = new MediaStreamTrackProcessor({ track }).readable.getReader();
+			pump();
+		} catch (error) {
+			reader = null;
+		}
+	}
+	$("source").textContent = reader ? "Reading the camera's own frames directly." : "This browser only shows the camera as video, so the video is read.";
+	try { await navigator.wakeLock?.request("screen"); } catch (error) { /* the phone may dim, which is fine */ }
+	$("intro").hidden = true;
+	$("meter").hidden = true;
+	$("aim").hidden = false;
+	await measure(1);  // learns the frames' format for the hello
+	await post("/hello", {
+		manual: supports("exposureMode", "manual"), white: supports("whiteBalanceMode", "manual"),
+		compensation: caps.exposureCompensation !== undefined, temperature: caps.colorTemperature !== undefined,
+		direct: !!reader, frame: frameInfo, settings: track.getSettings(), caps, agent: navigator.userAgent,
+	}).catch(() => {});
+	watch();
+};
+
+// The guide rings over the preview, where the circle's edge must fall.
+function drawGuide() {
+	const w = video.videoWidth || 4, h = video.videoHeight || 3, half = Math.min(w, h) / 2;
+	for (const [id, r] of [["near", EDGE_NEAR], ["far", EDGE_FAR]]) {
+		const ring = $(id);
+		ring.setAttribute("cx", 50); ring.setAttribute("cy", 50);
+		ring.setAttribute("rx", r * half / w * 100); ring.setAttribute("ry", r * half / h * 100);
+	}
+}
+
+function guideColor(color) {
+	for (const id of ["near", "far"]) $(id).setAttribute("stroke", color);
+}
+
+// Hands each camera frame to whoever waits for one, else lets it go at once,
+// as frames held back stall the camera.
+async function pump() {
+	for (;;) {
+		const { value, done } = await reader.read();
+		if (done) return;
+		const wanted = waiting.shift();
+		if (wanted) wanted(value); else value.close();
+	}
+}
+
+// Sums for one picture: the middle, the ring, the brightness in rings from
+// the middle out (to find the circle's edge), clipping, and how sharp the
+// stripes in the ring are.
+function sums() {
+	return {
+		inner: [0, 0, 0], innerN: 0, outer: [0, 0, 0], outerN: 0, clipped: 0, counted: 0,
+		bins: new Float64Array(BINS), binN: new Float64Array(BINS), ripple: 0, rippleBase: 0,
+	};
+}
+
+function add(s, rr, lr, lg, lb, top) {
+	const luma = 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+	const k = Math.min(BINS - 1, Math.floor(rr * BINS));
+	s.bins[k] += luma; s.binN[k]++;
+	if (rr <= INNER) {
+		s.inner[0] += lr; s.inner[1] += lg; s.inner[2] += lb; s.innerN++;
+	} else if (rr >= OUTER[0] && rr <= OUTER[1]) {
+		s.outer[0] += lr; s.outer[1] += lg; s.outer[2] += lb; s.outerN++;
+	} else {
+		return;
+	}
+	s.counted++;
+	if (top) s.clipped++;
+}
+
+// The circle's edge: where the profile crosses halfway from the middle's
+// brightness to the ring's.
+function finish(s) {
+	const level = (k) => s.binN[k] ? s.bins[k] / s.binN[k] : 0;
+	const middle = (level(0) + level(1) + level(2) + level(3)) / 4;
+	const ring = (level(16) + level(17) + level(18)) / 3;
+	let edge = null;
+	if (Math.abs(middle - ring) > 0.08 * Math.max(middle, ring)) {
+		const half = (middle + ring) / 2;
+		for (let k = 1; k < BINS; k++) {
+			if ((level(k - 1) - half) * (level(k) - half) <= 0) { edge = k / BINS; break; }
+		}
+	}
+	return {
+		rgb: s.inner.map((v) => v / Math.max(s.innerN, 1)), outer: s.outer.map((v) => v / Math.max(s.outerN, 1)),
+		clip: s.clipped / Math.max(s.counted, 1), edge, ripple: s.ripple / Math.max(s.rippleBase, 1e-6), level: middle,
+	};
+}
+
+// The next frame, measured.
+async function measureFrame() {
+	if (reader) {
+		const frame = await new Promise((done) => waiting.push(done));
+		try {
+			const result = await fromFrame(frame);
+			if (result) return result;
+		} finally {
+			frame.close();
+		}
+	}
+	await new Promise((done) => video.requestVideoFrameCallback ? video.requestVideoFrameCallback(() => done()) : setTimeout(done, 40));
+	return fromVideo();
+}
+
+// A camera frame as it comes: YUV (or RGB) planes, turned into light here.
+async function fromFrame(frame) {
+	const format = frame.format;
+	if (!format) return null;
+	const visible = frame.visibleRect || { x: 0, y: 0, width: frame.codedWidth, height: frame.codedHeight };
+	const side = Math.min(visible.width, visible.height) & ~1;
+	const rect = { x: (visible.x + (visible.width - side) / 2) & ~1, y: (visible.y + (visible.height - side) / 2) & ~1, width: side, height: side };
+	const data = new Uint8Array(frame.allocationSize({ rect }));
+	const planes = await frame.copyTo(data, { rect });
+	const space = frame.colorSpace || {};
+	frameInfo = frameInfo || { format, width: visible.width, height: visible.height, matrix: space.matrix, transfer: space.transfer, fullRange: space.fullRange };
+	const transfer = space.transfer || "bt709";
+	const table = curves[transfer] || (curves[transfer] = curve(transfer));
+	const s = sums();
+	const half = side / 2;
+	if (format.startsWith("RGB") || format.startsWith("BGR")) {
+		const red = format.startsWith("RGB") ? 0 : 2, blue = 2 - red;
+		const { offset, stride } = planes[0];
+		const at = (x, y) => offset + y * stride + x * 4;
+		for (let y = 0; y < side - 1; y += STEP) {
+			for (let x = 0; x < side - 1; x += STEP) {
+				const rr = Math.hypot(x - half, y - half) / half;
+				if (rr > 1) continue;
+				const i = at(x, y);
+				const r = data[i + red] / 255, g = data[i + 1] / 255, b = data[i + blue] / 255;
+				add(s, rr, decode(table, r), decode(table, g), decode(table, b), r >= 0.995 || g >= 0.995 || b >= 0.995);
+				if (rr >= OUTER[0] && rr <= OUTER[1]) {
+					s.ripple += Math.abs(data[i + 1] - data[at(x + 1, y) + 1]) + Math.abs(data[i + 1] - data[at(x, y + 1) + 1]);
+					s.rippleBase += data[i + 1] + data[at(x, y + 1) + 1];
+				}
+			}
+		}
+		return finish(s);
+	}
+	// YUV: the luma plane, then chroma at half (or full) resolution.
+	const nv12 = format.startsWith("NV12");
+	const sx = format.startsWith("I444") ? 0 : 1;
+	const sy = format.startsWith("I420") || nv12 ? 1 : 0;
+	const [kr, kb] = space.matrix === "bt709" ? [0.2126, 0.0722] : space.matrix === "bt2020-ncl" ? [0.2627, 0.0593] : [0.299, 0.114];
+	const kg = 1 - kr - kb;
+	const full = space.fullRange !== false;  // camera frames are full range unless they say not
+	const top = full ? 254 : 235;
+	const Y = planes[0], U = planes[1], V = nv12 ? planes[1] : planes[2];
+	const luma = (x, y) => data[Y.offset + y * Y.stride + x];
+	for (let y = 0; y < side - 1; y += STEP) {
+		const cy = y >> sy;
+		for (let x = 0; x < side - 1; x += STEP) {
+			const rr = Math.hypot(x - half, y - half) / half;
+			if (rr > 1) continue;
+			const cx = x >> sx;
+			const l = luma(x, y);
+			const u = nv12 ? data[U.offset + cy * U.stride + cx * 2] : data[U.offset + cy * U.stride + cx];
+			const v = nv12 ? data[V.offset + cy * V.stride + cx * 2 + 1] : data[V.offset + cy * V.stride + cx];
+			const yy = full ? l / 255 : (l - 16) / 219;
+			const cb = full ? (u - 128) / 255 : (u - 128) / 224;
+			const cr = full ? (v - 128) / 255 : (v - 128) / 224;
+			const r = yy + 2 * (1 - kr) * cr;
+			const b = yy + 2 * (1 - kb) * cb;
+			const g = (yy - kr * r - kb * b) / kg;
+			add(s, rr, decode(table, r), decode(table, g), decode(table, b), l >= top || r >= 0.995 || g >= 0.995 || b >= 0.995);
+			if (rr >= OUTER[0] && rr <= OUTER[1]) {
+				s.ripple += Math.abs(l - luma(x + 1, y)) + Math.abs(l - luma(x, y + 1));
+				s.rippleBase += l + luma(x, y + 1);
+			}
+		}
+	}
+	return finish(s);
+}
+
+// The video as the browser draws it, where camera frames can't be had.
+function fromVideo() {
+	const w = video.videoWidth, h = video.videoHeight;
+	const side = Math.min(w, h);
+	canvas.width = side;
+	canvas.height = side;
+	context.drawImage(video, (w - side) / 2, (h - side) / 2, side, side, 0, 0, side, side);
+	const pixels = context.getImageData(0, 0, side, side).data;
+	const table = curves.srgb || (curves.srgb = curve("srgb"));
+	const s = sums();
+	const half = side / 2;
+	const at = (x, y) => (y * side + x) * 4;
+	for (let y = 0; y < side - 1; y += STEP) {
+		for (let x = 0; x < side - 1; x += STEP) {
+			const rr = Math.hypot(x - half, y - half) / half;
+			if (rr > 1) continue;
+			const i = at(x, y);
+			add(s, rr, decode(table, pixels[i] / 255), decode(table, pixels[i + 1] / 255), decode(table, pixels[i + 2] / 255),
+				pixels[i] > 252 || pixels[i + 1] > 252 || pixels[i + 2] > 252);
+			if (rr >= OUTER[0] && rr <= OUTER[1]) {
+				s.ripple += Math.abs(pixels[i + 1] - pixels[at(x + 1, y) + 1]) + Math.abs(pixels[i + 1] - pixels[at(x, y + 1) + 1]);
+				s.rippleBase += pixels[i + 1] + pixels[at(x, y + 1) + 1];
+			}
+		}
+	}
+	return finish(s);
+}
+
+async function measure(frames) {
+	const total = { rgb: [0, 0, 0], outer: [0, 0, 0], clip: 0, ripple: 0, level: 0, edge: null };
+	const edges = [];
+	for (let f = 0; f < frames; f++) {
+		const m = await measureFrame();
+		for (let k = 0; k < 3; k++) {
+			total.rgb[k] += m.rgb[k] / frames;
+			total.outer[k] += m.outer[k] / frames;
+		}
+		total.clip = Math.max(total.clip, m.clip);
+		total.ripple += m.ripple / frames;
+		total.level += m.level / frames;
+		if (m.edge !== null) edges.push(m.edge);
+	}
+	if (edges.length) total.edge = edges.reduce((a, b) => a + b, 0) / edges.length;
+	return total;
+}
+
+// While aiming: the rings turn green when the circle's edge is between them
+// and the stripes are blurred enough, with a word on what to change otherwise.
+async function watch() {
+	const light = $("light"), advice = $("advice");
+	while (!measuring) {
+		const m = await measure(1);
+		post("/aim", { edge: m.edge, ripple: m.ripple }).catch(() => {});  // the screen resizes the circle to fit
+		let state = "good", text = "Good. Keep it there and tap Start.";
+		if (m.level < 0.02) { state = "bad"; text = "Can't see the screen. Point the camera at the bright circle."; }
+		else if (m.edge === null) { state = "bad"; text = "Can't find the bright circle. Point at the middle of the screen."; }
+		else if (m.ripple > SHARP) { state = "bad"; text = "The stripes look sharp to the camera. Bring the phone closer to the screen, so they blur; the circle shrinks to fit."; }
+		else if (m.edge < EDGE_NEAR || m.edge > EDGE_FAR) { state = "check"; text = "Hold still a moment: the screen is fitting the circle to the rings."; }
+		const color = { good: "#4caf7a", check: "#e8a33d", bad: "#e05a47" }[state];
+		light.style.background = color;
+		guideColor(color);
+		advice.textContent = text;
+		$("start").disabled = state === "bad";
+		await sleep(250);
+	}
+}
+
+// With white on the screen: let the camera settle on it, then fix exposure
+// and white balance (at daylight, 6500 K, where the camera allows), so every
+// patch is measured alike.
+async function lock() {
+	if (locked) return locked;
+	const locks = { exposure: false, white: false, white_daylight: false };
+	for (const mode of ["exposureMode", "whiteBalanceMode", "focusMode"]) {
+		if (supports(mode, "continuous")) await constrain({ [mode]: "continuous" });
+	}
+	await sleep(1500);
+	if (supports("whiteBalanceMode", "manual")) {
+		const range = caps.colorTemperature;
+		if (range && range.min <= 6500 && range.max >= 6500) {
+			locks.white_daylight = await constrain({ whiteBalanceMode: "manual", colorTemperature: 6500 });
+		}
+		locks.white = locks.white_daylight || await constrain({ whiteBalanceMode: "manual" });
+	}
+	if (supports("focusMode", "manual")) await constrain({ focusMode: "manual" });
+	if (supports("exposureMode", "manual")) {
+		// Some cameras refuse values off their steps, or a time and ISO together,
+		// so simpler settings are tried in turn.
+		const settings = track.getSettings();
+		const onStep = (name, value) => caps[name]?.step ? Math.round(value / caps[name].step) * caps[name].step : value;
+		const time = caps.exposureTime && settings.exposureTime ? onStep("exposureTime", settings.exposureTime) : null;
+		const iso = caps.iso && settings.iso ? onStep("iso", settings.iso) : null;
+		const tries = [{ exposureTime: time, iso }, { exposureTime: time }, {}];
+		for (const extra of tries) {
+			const fixed = { exposureMode: "manual" };
+			for (const [key, value] of Object.entries(extra)) if (value) fixed[key] = value;
+			if (await constrain(fixed)) {
+				exposure.manual = true;
+				exposure.time = fixed.exposureTime ?? null;
+				exposure.iso = fixed.iso ?? null;
+				break;
+			}
+		}
+		locks.exposure = exposure.manual;
+	}
+	if (!exposure.manual && caps.exposureCompensation) exposure.comp = track.getSettings().exposureCompensation ?? 0;
+	await sleep(300);
+	locked = locks;
+	return locks;
+}
+
+// Less exposure: shorter time, else lower ISO, else (when not fixed) exposure
+// compensation, a step at a time until the picture really is darker, as some
+// cameras take the settings without acting on them. Returns false once
+// nothing left makes it darker.
+async function darker() {
+	const before = (await measure(2)).level;
+	const steps = [stepTime, stepIso, stepCompensation];
+	for (const step of steps) {
+		while (await step()) {
+			await sleep(400);
+			if ((await measure(2)).level < before * 0.92) return true;
+		}
+	}
+	return false;
+}
+
+async function stepTime() {
+	const range = caps.exposureTime;
+	if (!exposure.manual || !range) return false;
+	exposure.time = exposure.time || track.getSettings().exposureTime;
+	if (!exposure.time || exposure.time <= range.min * 1.01) return false;
+	exposure.time = Math.max(range.min, exposure.time * 0.6);
+	const fixed = { exposureMode: "manual", exposureTime: exposure.time };
+	if (exposure.iso) fixed.iso = exposure.iso;
+	await constrain(fixed);
+	return true;
+}
+
+async function stepIso() {
+	const range = caps.iso;
+	if (!exposure.manual || !range) return false;
+	exposure.iso = exposure.iso || track.getSettings().iso;
+	if (!exposure.iso || exposure.iso <= range.min * 1.01) return false;
+	exposure.iso = Math.max(range.min, exposure.iso * 0.7);
+	const fixed = { exposureMode: "manual", iso: exposure.iso };
+	if (exposure.time) fixed.exposureTime = exposure.time;
+	await constrain(fixed);
+	return true;
+}
+
+async function stepCompensation() {
+	const range = caps.exposureCompensation;
+	if (exposure.manual || !range || exposure.comp === null || exposure.comp <= range.min + 1e-6) return false;
+	exposure.comp = Math.max(range.min, exposure.comp - Math.max(range.step || 0.33, 0.33));
+	await constrain({ exposureCompensation: exposure.comp });
+	return true;
+}
+
+function show(progress) {
+	const length = 2 * Math.PI * 70;
+	$("arc").setAttribute("stroke-dasharray", `${length * progress} ${length}`);
+	$("percent").textContent = Math.round(progress * 100) + "%";
+}
+
+$("start").onclick = async () => {
+	measuring = true;
+	$("aim").hidden = true;
+	$("run").hidden = false;
+	const status = $("status");
+	try {
+		let next = await post("/reading", { id: -1 });
+		while (!next.done) {
+			show(next.progress || 0);
+			status.innerHTML = next.text ? next.text : "<b>Measuring.</b> Keep the phone still.";
+			const reading = { id: next.id };
+			if (next.lock) {
+				status.innerHTML = "<b>Setting up the camera…</b>";
+				reading.locks = await lock();
+			}
+			if (next.darker && !stuck) stuck = !(await darker());
+			await sleep(next.settle || 450);
+			Object.assign(reading, await measure(next.frames || 4));
+			reading.cant_darken = stuck;
+			next = await post("/reading", reading);
+		}
+		$("run").hidden = true;
+		$("end").hidden = false;
+		$("done").textContent = next.text || "Done.";
+	} catch (error) {
+		fail("Lost the connection: " + error.message + " Start again from the screen.");
+	}
+};
+
+// Back to lining up for another run, once the screen offers one.
+$("again").onclick = () => {
+	stuck = false;
+	$("end").hidden = true;
+	$("error").hidden = true;
+	$("aim").hidden = false;
+	measuring = false;
+	show(0);
+	watch();
+};
+</script>
+</body>
+</html>

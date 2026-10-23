@@ -1,5 +1,9 @@
 {
 	"drag": false,
 	"tutorial": true,
-	"landscape": true
+	"landscape": true,
+	"fade_in": true,
+	"endless_extra": true,
+	"extra_delay": 1.0,
+	"extra_stop": true
 }

@@ -1,8 +1,9 @@
 extends Control
-## The grown-up settings, in four tabs by what they are for: Levels (the level
+## The grown-up settings, in five tabs by what they are for: Levels (the level
 ## sequences, LevelConfig), Playing (dragging, the tutorial and shape size),
-## Dots (the dot filter, dots.json and noise.json, and the outline) and Colors
-## (the color groups, ColorGroups, and extra shapes). Beside them, the preview
+## Dots (the dot filter, dots.json and noise.json, and the outline), Colors
+## (the color groups, ColorGroups, and extra shapes) and Calibration (this
+## screen's color calibration, DisplayCalibration). Beside them, the preview
 ## shows the dots, colors and shapes live, with the color group last chosen or
 ## edited, and can show it all through color blind eyes (ColorVision). Nothing
 ## is written until Save; leaving with unsaved changes asks first.
@@ -30,16 +31,19 @@ const EDGE_SCROLL := 90.0  # px from the list's top or bottom edge where a dragg
 const EDGE_SPEED := 700.0  # px/s it scrolls at, right at the edge
 const ABOUT_SEQUENCES := "The game plays these sequences from top to bottom. Each one plays its level the set number of times, then the next one starts. After the last, the game ends with a big star. Drag a card by the dots on its left to move it.\n\nA sequence set to play forever is the last one ever reached; any after it are shown faded."
 const ABOUT_TIME_BONUS := "In a timed level, each right match adds %d s (never past the level's full time), and each tap that lands on no piece, hole or button takes %d s away. Wrong drops cost nothing."
-const ABOUT_EXTRA := "Extra pieces on the board, in colors this sequence's color group's type of color blindness sees as well as anyone. A player who finds them but misses the group's own pieces is missing color, not attention.\n\nCounted: every piece must be placed to clear the level. Not counted: only the group's own pieces must be, and extras are optional."
+const ABOUT_EXTRA := "Extra pieces on the board, in colors this sequence's color group's type of color blindness sees as well as anyone. A player who finds them but misses the group's own pieces is missing color, not attention.\n\nCounted: every piece must be placed to clear the level. Not counted: only the group's own pieces must be, and extras are optional.\n\nWhile Endless extra shapes is on, on the Playing tab, it sets the extras for every level and these wait until it's off."
+const ABOUT_ENDLESS := "Every level gets one extra piece, in a color everyone can see, and a new one comes in each time one is placed, so a player who can't find the color group's pieces always has something to do and doesn't give up. Every piece placed, extra or not, fills a step of the level's meter, which has a step for each of the group's pieces plus one, so extras can stand in for pieces the player can't see. Those pieces are still recorded as missed.\n\nWhile it's on, the extra shapes set on each level sequence are not used.\n\nWait: how long after an extra is placed the next one comes, so the player has a moment to look for the others first.\n\nStop once a piece is found: after the player places one of the color group's own pieces, no new extras come that level, since that player can see the colors. The meter can still be filled with the pieces left."
 const ABOUT_DRAG := "Pieces can always be moved by tapping one, then its hole. Dragging lets them be carried there too. Turn it off for players who find dragging hard, so every move is two taps."
 const ABOUT_TUTORIAL := "Starts each game with an extra first level: one piece in a dark color everyone can see, without dots, and a hand that keeps showing how to move it, by dragging or by tapping, until it's in. It doesn't count toward the score or the stats."
 const ABOUT_LANDSCAPE := "On phones and tablets the game stays sideways, turning only between the two sideways ways round, which gives the shapes the most room. Off, it also turns upright with the device, and the board gets narrower and taller. Computers and browsers are not affected."
 const ABOUT_DOTS := "The dots that hide the shapes, like an Ishihara plate. Smaller, tighter dots make the shapes harder to pick out. Area covered is how much of the board the dots fill."
 const ABOUT_OUTLINE := "Pieces are drawn hollow, as an outline, as a share of their size. Bolder is easier to spot; much thinner, and the line slips between the dots, where the filter can't see it."
 const ABOUT_NOISE := "Each dot's color shifts a little, so a shape can't be found by one exact color. Amount is how far colors shift; patch size is how big the areas that shift together are."
+const ABOUT_FADE_IN := "The first time the dots come on in a game, the shapes show plainly for a moment and the dots fade in over them, so the player knows what they're looking for. The clock waits until the dots are fully in. Off, the dots are there from the start."
 const ABOUT_BOARD := "The color between the dots and on the board, like the paper of a printed plate. It is the same around every dot, so it never gives a shape away."
 const ABOUT_GROUPS := "Each group is made for one type of color blindness: its piece colors blend into its background for that type. The level sequences use these groups.\n\nThe bar under each piece color shows whether it really blends in for that type: green blends in, orange may be spotted."
-const ABOUT_EXTRA_COLORS := "Extra shapes take colors outside the group's confusion line, which its type sees as well as anyone. This sets how different they look from the background to that type, as a CIELAB distance: around 10 is subtle, 40 and up is plain to see. How many each level has is set per sequence."
+const ABOUT_EXTRA_COLORS := "Extra shapes take colors from a fixed set (near-black, navy, dark red, charcoal, yellow and white) that stand apart from the backgrounds by lightness, which every type of color blindness still sees. So they never vanish, whoever plays.\n\nThis sets how different they must look from the background to every type and to normal vision, as a CIELAB distance: around 10 is subtle, 40 and up is plain to see, and about 50 is the most the set reaches. How many each level has is set per sequence."
+const ABOUT_CALIBRATION := "Screens don't all show a color the same way: many make colors more vivid, bluer or brighter in the middle tones than the standard (sRGB) the game's colors are picked in. A color vision test hangs on small color differences, so a screen that shifts them can hide a color blind player's difficulty, or invent one.\n\nCalibrating measures this screen and corrects every color the game draws to make up for it. Phones and tablets don't let apps change the screen itself, so the game does it, on top of everything it shows.\n\nBy eye: you tap a few squares, the one hardest to see and the grayest grays, which sets the screen's brightness curve (gamma) and its gray balance. It can't measure the screen's color range or exact white.\n\nWith a phone camera: another phone measures the screen. Best is the Shape Match Meter app on Android, offered by the page the code opens: it reads the camera's raw sensor data, before the phone's picture processing, and measures the brightness curves, the color range and the white point directly, as color scientists do. Without it, the phone's browser measures: it finds the brightness curves by matching stripes, then, where the phone's browser can fix its camera's settings, the color range and white point too, and checks the game's colors before and after. Errors are given as ΔE00: under 1 can't be seen, up to 2 suits vision tests, over 3 is plain to see.\n\nA calibration belongs to one screen, so it is kept on this device only, not in the shared settings. Calibrate each device the game is played on, and again after changing its brightness or color mode."
 const ABOUT_VISION := "Shows the whole page as someone with that type of color blindness sees it, to check that a color group really hides its shapes. It stays on in the game too until set back to normal vision.\n\nStrength: many color blind people still have weakened cones of the missing type, so they see some of the difference. 100% is the full form."
 
 @onready var tabs: TabContainer = %Tabs
@@ -47,6 +51,7 @@ const ABOUT_VISION := "Shows the whole page as someone with that type of color b
 @onready var playing_page: VBoxContainer = %PlayingPage
 @onready var dots_page: VBoxContainer = %DotsPage
 @onready var colors_page: VBoxContainer = %ColorsPage
+@onready var calibration_page: VBoxContainer = %CalibrationPage
 @onready var back: ToyButton = %Back
 @onready var save: Button = %Save
 @onready var saved_note: Label = %SavedNote
@@ -60,6 +65,8 @@ var _level_list := VBoxContainer.new()
 var _dot_sliders := {}  # {max_radius, gap, fill: HSlider}
 var _noise_sliders := {}  # {part: {channel: {wavelength, amplitude}}} of HSliders, as in Dots.noise
 var _size_slider: HSlider
+var _extra_delay_slider: HSlider
+var _extra_stop: ToySwitch
 var _outline_slider: HSlider
 var _extra_slider: HSlider
 var _extra_swatches := VBoxContainer.new()  # each color group's extra-shape colors
@@ -84,6 +91,10 @@ var _clean := ""  # the settings as last loaded or saved, see _state
 var _dirty := false
 var _check_in := 0.0
 var _reorder := {}  # {row, pointer} while a sequence card is being dragged to a new place
+var _calibration_status := Label.new()
+var _calibration_switch: ToySwitch
+var _calibration_forget := Button.new()
+var _calibrating: CalibrationScreen  # the open calibration steps, or null
 
 
 func _ready() -> void:
@@ -91,12 +102,14 @@ func _ready() -> void:
 	PlaySettings.load_settings()  # the Levels tab shows the tutorial from it
 	var drag_scroll := DragScroll.new()  # drag anywhere on a tab, or in a pop-up, to scroll it
 	drag_scroll.target = func():
+		if is_instance_valid(_calibrating):
+			return null  # its sliders and buttons take every press
 		if is_instance_valid(_popup):
 			return _popup.scroll()
 		return tabs.get_current_tab_control() as ScrollContainer
 	add_child(drag_scroll)
 	for i in tabs.get_tab_count():
-		tabs.set_tab_title(i, ["Levels", "Playing", "Dots", "Colors"][i])
+		tabs.set_tab_title(i, ["Levels", "Playing", "Dots", "Colors", "Calibration"][i])
 	tabs.add_theme_font_size_override("font_size", 24)
 	_build_levels_page()
 	# Dots has loaded its settings by now, as children are ready first.
@@ -107,6 +120,7 @@ func _ready() -> void:
 	preview.resized.connect(_layout_preview)
 	_build_colors_page()
 	_build_vision_controls()
+	_build_calibration_page()
 	back.activated.connect(_on_back)
 	save.pressed.connect(_save)
 	resized.connect(_fit_columns)
@@ -580,8 +594,9 @@ func _refresh_rows() -> void:
 		row.time_bonus.disabled = not row.time_on.button_pressed
 		row.repetitions.editable = not row.forever.button_pressed
 		row.colors.disabled = not row.filter.button_pressed
-		var extra := int(row.extra.value)
-		row.extra_scored.disabled = extra == 0
+		# Endless extras set every level's extras, so these wait until it's off.
+		row.extra.editable = not PlaySettings.endless_extra
+		row.extra_scored.disabled = PlaySettings.endless_extra or int(row.extra.value) == 0
 		row.title.text = "%d %s · %d %s each" % [holes, "hole" if holes == 1 else "holes", pieces, "piece" if pieces == 1 else "pieces"]
 		for box in [row.chips, row.editor_chips]:
 			for child in box.get_children():
@@ -612,7 +627,9 @@ func _chips_for(row: Dictionary) -> Array:
 	else:
 		chips.append(["No dots", "dots"])
 	var extra := int(row.extra.value)
-	if extra > 0:
+	if PlaySettings.endless_extra:
+		chips.append(["Endless extra, counted", "extra"])
+	elif extra > 0:
 		chips.append(["+%d extra, %s" % [extra, "counted" if row.extra_scored.button_pressed else "not counted"], "extra"])
 	return chips
 
@@ -655,6 +672,24 @@ func _build_playing_page() -> void:
 	)
 	tutorial_card.add_child(tutorial)
 
+	var endless_card := _card(playing_page, "Endless extra shapes", "Always one more piece to find, so no one gets stuck.", ABOUT_ENDLESS)
+	var endless := _switch("Endless extra shapes", PlaySettings.endless_extra)
+	endless.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	endless.toggled.connect(func(on):
+		PlaySettings.endless_extra = on
+		_refresh_rows()
+		_refresh_endless()
+	)
+	endless_card.add_child(endless)
+	_extra_delay_slider = _slider(endless_card, "Wait for the next", 0, 10, 0.5, PlaySettings.extra_delay,
+			func(v): return "%s s" % (str(int(v)) if v == int(v) else "%.1f" % v),
+			func(): PlaySettings.extra_delay = _extra_delay_slider.value)
+	_extra_stop = _switch("Stop once a piece is found", PlaySettings.extra_stop)
+	_extra_stop.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_extra_stop.toggled.connect(func(on): PlaySettings.extra_stop = on)
+	endless_card.add_child(_extra_stop)
+	_refresh_endless()
+
 	var screen_card := _card(playing_page, "Screen", "Keep phones and tablets sideways.", ABOUT_LANDSCAPE)
 	var landscape := _switch("Lock to landscape", PlaySettings.landscape)
 	landscape.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
@@ -665,6 +700,12 @@ func _build_playing_page() -> void:
 	_size_slider = _slider(size_card, "Size", 5, 40, 1, ShapeView.side_fraction * 100,
 			func(v): return "%d%%" % v, _on_size_changed)
 	size_card.add_child(_note("As a share of the board's shorter side."))
+
+
+## The endless extras' wait and stop only matter while they are on.
+func _refresh_endless() -> void:
+	_extra_delay_slider.editable = PlaySettings.endless_extra
+	_extra_stop.disabled = not PlaySettings.endless_extra
 
 
 func _on_size_changed() -> void:
@@ -731,6 +772,12 @@ func _build_dots_page() -> void:
 			}
 		if part != Dots.NOISE_PARTS.keys()[-1]:
 			fold.add_child(HSeparator.new())
+
+	var fade_card := _card(dots_page, "Fade in", "Show the shapes first, then fade the dots in over them.", ABOUT_FADE_IN)
+	var fade := _switch("Fade in the first dots", PlaySettings.fade_in)
+	fade.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	fade.toggled.connect(func(on): PlaySettings.fade_in = on)
+	fade_card.add_child(fade)
 
 	var board_card := _card(dots_page, "Board background", "The paper color between the dots.", ABOUT_BOARD)
 	_board_color.custom_minimum_size = Vector2(140, 52)
@@ -812,7 +859,7 @@ func _build_colors_page() -> void:
 	colors_page.add_child(_group_list)
 
 	var extra_card := _card(colors_page, "Extra shape colors", "How easy the extra shapes are to see.", ABOUT_EXTRA_COLORS)
-	_extra_slider = _slider(extra_card, "How easy to see", 5, 80, 1, ExtraShapes.difference,
+	_extra_slider = _slider(extra_card, "How easy to see", 5, ExtraShapes.MAX_DIFFERENCE, 1, ExtraShapes.difference,
 			func(v): return "%d" % v, _on_extra_changed)
 	_extra_swatches.add_theme_constant_override("separation", 8)
 	extra_card.add_child(_extra_swatches)
@@ -867,8 +914,8 @@ func _show_extra_colors() -> void:
 			var swatch := ColorRect.new()
 			swatch.color = color
 			swatch.custom_minimum_size = Vector2(48, 32)
-			swatch.tooltip_text = "#%s, which %s players see %d apart from the background" % [color.to_html(false), group.name,
-					roundi(ColorGroups.seen_difference(group.id, color, group.background))]
+			swatch.tooltip_text = "#%s, which every player sees at least %d apart from the background" % [color.to_html(false),
+					roundi(ColorGroups.seen_by_all(color, group.background))]
 			row.add_child(swatch)
 		if colors.is_empty():
 			row.add_child(_note("No color found, so its levels get no extra shapes."))
@@ -1027,6 +1074,87 @@ func _update_cards() -> void:
 					"it blends in, on their confusion line" if matches else "off their confusion line, so they may spot it"]
 
 
+# ---------- Calibration ----------
+
+func _build_calibration_page() -> void:
+	_intro(calibration_page, "Correct this screen's colors so the color groups show as designed. Kept on this device only.", "Calibrating the screen", ABOUT_CALIBRATION)
+	var status := _card(calibration_page, "This screen")
+	_calibration_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_calibration_status.add_theme_font_size_override("font_size", 20)
+	status.add_child(_calibration_status)
+	_calibration_switch = _switch("Use the calibration", DisplayCalibration.enabled)
+	_calibration_switch.toggled.connect(func(on): DisplayCalibration.enabled = on)
+	_calibration_forget.text = "Forget it"
+	PopupCard.tint(_calibration_forget, REMOVE)
+	_calibration_forget.pressed.connect(func():
+		PopupCard.confirm(self, "Forget the calibration?", "The game will show its colors as they are on this screen. It's gone for good once you save.",
+				"Forget it", _forget_calibration, "Cancel", true)
+	)
+	status.add_child(_row([_calibration_switch, _calibration_forget]))
+
+	var eye := _card(calibration_page, "By eye", "About two minutes, just tapping: the square that's hardest to see, then the grayest grays.")
+	var eye_start := Button.new()
+	eye_start.text = "Calibrate by eye"
+	eye_start.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	eye_start.pressed.connect(_calibrate.bind("eye"))
+	eye.add_child(eye_start)
+
+	var camera := _card(calibration_page, "With a phone camera", "About two minutes. Another phone measures this screen. On Android, the page it opens offers the small Meter app, which reads the camera's raw data and measures best. Both must be on the same Wi-Fi.")
+	var camera_start := Button.new()
+	camera_start.text = "Calibrate with a phone"
+	camera_start.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	camera_start.pressed.connect(_calibrate.bind("camera"))
+	camera.add_child(camera_start)
+	if not CalibrationLink.supported():
+		camera_start.disabled = true
+		camera.add_child(_note("Not in the browser version: a web page can't serve the phone. Use the app, or calibrate by eye."))
+
+	var before := _card(calibration_page, "Before you start", "Set the screen up as it will be played on:")
+	before.add_child(CalibrationArt.tiles(CalibrationScreen.BEFORE_YOU_START, Vector2(150, 105), 16))
+	_refresh_calibration()
+
+
+func _calibrate(how: String) -> void:
+	if is_instance_valid(_calibrating):
+		return
+	_calibrating = CalibrationScreen.open(self, how)
+	_calibrating.finished.connect(func(_result): _refresh_calibration())
+
+
+func _forget_calibration() -> void:
+	DisplayCalibration.clear()
+	_refresh_calibration()
+
+
+## What the calibration in use is, in words.
+func _refresh_calibration() -> void:
+	_calibration_switch.set_on(DisplayCalibration.enabled)
+	_calibration_switch.disabled = not DisplayCalibration.is_calibrated()
+	_calibration_forget.disabled = not DisplayCalibration.is_calibrated()
+	if not DisplayCalibration.is_calibrated():
+		_calibration_status.text = "Not calibrated: the game sends its colors to the screen as they are."
+		return
+	var notes := DisplayCalibration.notes
+	var lines: Array[String] = ["Calibrated %s on %s." % ["by eye" if DisplayCalibration.method == "eye" else "with a phone camera",
+			DisplayCalibration.date.get_slice("T", 0)]]
+	var g: Dictionary = notes.get("gammas", {})
+	if g.has("r"):
+		lines.append("Gamma: red %.2f, green %.2f, blue %.2f (standard is about 2.2)." % [g.r, g.g, g.b])
+	var also: Array[String] = []
+	if notes.get("gamut_used", false):
+		also.append("color range")
+	if notes.get("white_used", false):
+		also.append("white point")
+	if not also.is_empty():
+		lines.append("Also corrects its %s." % " and ".join(also))
+	if notes.has("after_grays"):
+		# The camera judges grays well and bright colors only roughly (see RawCalibration).
+		lines.append("Gray error after: average %.1f, worst %.1f ΔE00, %s." % [notes.after_grays.mean, notes.after_grays.max, DisplayCalibration.tier(notes.after_grays.max)])
+	elif notes.has("after"):
+		lines.append("Color error after: average %.1f, worst %.1f ΔE00, %s." % [notes.after.mean, notes.after.max, DisplayCalibration.tier(notes.after.max)])
+	_calibration_status.text = "\n".join(lines)
+
+
 # ---------- Preview ----------
 
 ## Under the preview's title: buttons to see it all as each type of color
@@ -1139,7 +1267,8 @@ func _fit_columns() -> void:
 func _state() -> String:
 	return var_to_str([_levels(), dots.max_radius, dots.gap, dots.fill, dots.board_color, dots.noise, _groups,
 			ShapeView.side_fraction, ShapeView.outline_percent, ExtraShapes.difference,
-			ColorVision.mode, ColorVision.severity, PlaySettings.drag, PlaySettings.tutorial, PlaySettings.landscape])
+			ColorVision.mode, ColorVision.severity, DisplayCalibration.state(), PlaySettings.drag, PlaySettings.tutorial, PlaySettings.landscape, PlaySettings.fade_in, PlaySettings.endless_extra,
+			PlaySettings.extra_delay, PlaySettings.extra_stop])
 
 
 ## Shows "Unsaved changes" by Save while there are any, and carries a held
@@ -1180,6 +1309,7 @@ func _on_back() -> void:
 
 func _leave() -> void:
 	ColorVision.load_settings()  # leave unsaved changes behind
+	DisplayCalibration.load_settings()
 	PlaySettings.load_settings()
 	await get_tree().create_timer(0.15).timeout  # let the button's pop play
 	get_tree().change_scene_to_file("res://menu.tscn")
@@ -1188,7 +1318,7 @@ func _leave() -> void:
 ## Writes every settings file; returns whether all of them were written.
 func _save() -> bool:
 	var failed := false
-	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size(), ExtraShapes.save_settings(), ColorVision.save_settings(), PlaySettings.save_settings()]:
+	for result in [LevelConfig.save_levels(_levels()), dots.save_config(), dots.save_noise(), ColorGroups.save_settings(_groups), ShapeView.save_size(), ExtraShapes.save_settings(), ColorVision.save_settings(), DisplayCalibration.save_settings(), PlaySettings.save_settings()]:
 		if result != OK:
 			failed = true
 			push_error("Could not save config: %s" % error_string(result))

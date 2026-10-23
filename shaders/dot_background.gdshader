@@ -10,6 +10,7 @@ uniform vec4 background : source_color;
 uniform vec4 mask_rect;      // x, y, width, height as fractions of this rect
 uniform vec2 area_size;      // this rect's size in px
 uniform float mask_radius;   // the mask's corner radius in px
+uniform float opacity = 1.0; // below 1 while the dots fade in over the shapes
 
 void fragment() {
 	vec2 p = UV * area_size;
@@ -19,4 +20,5 @@ void fragment() {
 	vec2 q = abs(p - center) - half_size + mask_radius;
 	float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - mask_radius;
 	COLOR = d < 0.0 ? texture(screen_tex, SCREEN_UV) : background;
+	COLOR.a *= opacity;
 }

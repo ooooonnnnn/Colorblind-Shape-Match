@@ -23,6 +23,7 @@ const TRAY_PADDING := 24.0   # px between the holes' bounding circles and the tr
 const TRAY_INSET := 16.0     # px between the tray and the bottom of the board
 const EDGE_GROWTH := 1.2     # pieces swell up to this when pressed, squished or picked up
 const EDGE_GAP := 16.0       # px of full-size dots kept between a piece and the board's edge
+const DOTS_FADE := 2.5       # seconds the dots take to fade in over the shapes, the first time they show
 ## Soft jingles for a cleared level, one picked at random each time but never
 ## the same twice running, so they stay pleasant over a long session.
 const CHEERS: Array[AudioStream] = [preload("res://sounds/cheer_1.wav"), preload("res://sounds/cheer_2.wav"), preload("res://sounds/cheer_3.wav")]
@@ -47,7 +48,6 @@ const TUTORIAL_COLOR := Icons.INK
 @onready var chime: AudioStreamPlayer = $Chime
 @onready var pop: AudioStreamPlayer = $Pop
 @onready var boing: AudioStreamPlayer = $Boing
-@onready var whoosh: AudioStreamPlayer = $Whoosh
 @onready var bling: AudioStreamPlayer = $Bling
 @onready var fanfare: AudioStreamPlayer = $Fanfare
 @onready var finale: AudioStreamPlayer = $Finale
@@ -61,9 +61,16 @@ var pieces_per_shape := 0  # copies of each shape to sort into its hole
 var level_time := 0.0      # seconds; <= 0 means no time limit
 var time_bonus := false    # matches and stray taps move the deadline (see LevelConfig)
 var extra_scored := true   # placing an extra shape counts toward clearing the level (see LevelConfig)
+var endless_extra := false  # a placed extra shape is replaced by a new one (see PlaySettings)
+var _found_own := false     # a piece of the level's own has been placed, which can stop new extras
+var _level_shapes := []     # the level's shapes, one per hole
+var _extra_colors: Array[Color] = []
+var _piece_reach := 0.0     # px a piece's outline reaches past its shape
+var _below_tray := Rect2()  # where pieces never start
 var _left_to_clear := 0    # placements still needed to clear the level
 var tutorial := false      # this level is TUTORIAL_LEVEL
 var _tutorial_pending := false  # the tutorial is still to be cleared this game
+var _dots_faded := false  # the dots have come on once this game, faded in or not
 var _hand: TutorialHand
 var level_num := 0
 var score := 0  # levels cleared this run, not counting the tutorial
@@ -249,16 +256,23 @@ func new_level() -> void:
 		level_num += 1
 	effects.clear_star()
 	var group := ColorGroups.find(color_groups, ColorGroups.pick(color_groups, config.colors))
-	# Extra shapes join the level's own pieces on the board, in colors its
-	# group's type sees as well as anyone (see ExtraShapes). When they count,
+	# Extra shapes join the level's own pieces on the board, in colors every
+	# type of color blindness sees (see ExtraShapes). When they count,
 	# every piece must be placed; when not, only the level's own pieces.
 	var own: int = config.holes * config.shapes
 	var extra_colors: Array[Color] = []
-	if config.extra > 0:
+	# Endless extras go in every level but the tutorial, which shows one piece only.
+	endless_extra = PlaySettings.endless_extra and not tutorial
+	_found_own = false
+	var wanted: int = 1 if endless_extra else config.extra
+	if wanted > 0:
 		extra_colors = ColorGroups.extra_colors(group, ExtraShapes.difference)
-	var extra_count: int = config.extra if not extra_colors.is_empty() else 0
+	var extra_count: int = wanted if not extra_colors.is_empty() else 0
 	var total := own + extra_count
-	extra_scored = config.extra_scored
+	# Endless extras always count, so a player who can't see the group's pieces
+	# still fills the meter with them.
+	extra_scored = config.extra_scored or endless_extra
+	_extra_colors = extra_colors
 	_left_to_clear = total if extra_scored else own
 	dots.show_group(group, PackedColorArray(extra_colors))
 	_level_group = group.id if config.filter else Stats.BASELINE
@@ -295,6 +309,9 @@ func new_level() -> void:
 	# The tray sits along the bottom, and pieces only start above it, not beside it.
 	var below_tray := Rect2(0, tray_rect.position.y, board_size.x, board_size.y - tray_rect.position.y)
 	var piece_spots := _scatter_pieces(piece_radii, below_tray)
+	_level_shapes = shapes
+	_piece_reach = outline_reach
+	_below_tray = below_tray
 
 	for i in hole_count:
 		var hole := ShapeView.new()
@@ -309,23 +326,16 @@ func new_level() -> void:
 
 	var colors := ColorGroups.piece_colors(group.colors.size(), hole_count, own)
 	for i in piece_radii.size():
-		var p := ShapeView.new()
-		p.setup(shapes[i % hole_count], true)
-		p.set_meta("spot_ms", -1)
-		p.set_meta("wrong", 0)
-		p.set_meta("touched_ms", -1)
+		var fill: Color
+		if i < own:
+			fill = TUTORIAL_COLOR if tutorial else dots.figure_color(colors[i])
+		else:
+			fill = extra_colors[(i - own) % extra_colors.size()]
+		var p := _add_piece(i % hole_count, fill, piece_spots[i], piece_radii[i])
 		if i < own:
 			p.set_meta("color", colors[i])
-			p.fill = TUTORIAL_COLOR if tutorial else dots.figure_color(colors[i])
 		else:
 			p.set_meta("extra", true)
-			p.fill = extra_colors[(i - own) % extra_colors.size()]
-		p.target_hole = holes[i % hole_count]
-		p.home = piece_spots[i] / board_size
-		p.norm_pos = p.home
-		board.add_child(p)
-		p.gui_input.connect(_on_piece_input.bind(p))
-		pieces.append(p)
 		# Under the filter they appear at once: a piece growing would make its
 		# dots change color in a way anyone could see, giving it away.
 		if not config.filter:
@@ -336,14 +346,66 @@ func new_level() -> void:
 	# tray's opening uncovering pieces.
 	if config.filter:
 		dots.refresh()
+	# The first time the dots come on, the shapes show plainly and the dots fade
+	# in over them, so the player sees what they're looking for. The clock and
+	# the search times wait until the dots are fully in.
+	var fade := 0.0
+	if config.filter and not _dots_faded:
+		_dots_faded = true
+		if PlaySettings.fade_in:
+			fade = DOTS_FADE
+			dots.fade_in(fade)
 	if tutorial:
 		_hand = TutorialHand.new()
 		board.add_child(_hand)
 		_hand.play(shapes[0], TUTORIAL_COLOR, pieces[0].home, holes[0].norm_pos, PlaySettings.drag)
-	deadline_ms = Time.get_ticks_msec() + int(level_time * 1000)
+	deadline_ms = Time.get_ticks_msec() + int((level_time + fade) * 1000)
 	transitioning = false
 	_level_started_ms = Time.get_ticks_msec()
-	_search_from_ms = _level_started_ms
+	_search_from_ms = _level_started_ms + int(fade * 1000)
+
+
+## A piece of the level's shape number k, for its hole, filled with fill,
+## starting at spot (px on the board).
+func _add_piece(k: int, fill: Color, spot: Vector2, radius: float) -> ShapeView:
+	var p := ShapeView.new()
+	p.setup(_level_shapes[k], true)
+	p.set_meta("spot_ms", -1)
+	p.set_meta("wrong", 0)
+	p.set_meta("touched_ms", -1)
+	p.set_meta("radius", radius)  # px, to keep later pieces clear of it
+	p.fill = fill
+	p.target_hole = holes[k]
+	p.home = spot / board_size
+	p.norm_pos = p.home
+	board.add_child(p)
+	p.gui_input.connect(_on_piece_input.bind(p))
+	pieces.append(p)
+	return p
+
+
+## Brings in a new extra shape, in a random one of the level's shapes and extra
+## colors, at a free spot clear of the pieces on the board, if it is still
+## wanted after the wait (see PlaySettings). Without the filter
+## it pops in like the level's first pieces; under it, it appears at once.
+func _spawn_extra(id: int) -> void:
+	# The level may have ended, or a piece of its own been found, while it waited.
+	if id != _level_id or transitioning or (PlaySettings.extra_stop and _found_own):
+		return
+	var k := randi() % hole_count
+	var spots: Array[Vector2] = []
+	var radii: Array[float] = []
+	for p in pieces:
+		spots.append(p.norm_pos * board_size)
+		radii.append(p.get_meta("radius"))
+	radii.append(Shapes.radius(_level_shapes[k].points) * ShapeView.side_for(board_size) + _piece_reach)
+	var spot := _free_spot(spots, radii, _below_tray)
+	if spot == Vector2.INF:
+		return  # the board is too full for now; the level goes on without it
+	var p := _add_piece(k, _extra_colors[randi() % _extra_colors.size()], spot, radii[-1])
+	p.set_meta("extra", true)
+	if _level_group == Stats.BASELINE:
+		p.pop_in(0.0)
 
 
 ## The badge at the top right: a little plate in the colors being tested and
@@ -478,9 +540,10 @@ func _offer_home() -> void:
 	)
 
 
-## Cleared levels get a cheering star, confetti and a jingle (see _cheer).
-## When time runs out there is no failure message: the pieces just float away
-## with a whoosh.
+## Every level ends with a cheering star, confetti and a jingle (see _cheer),
+## even when time runs out: then the meter fills the rest of the way at once,
+## and the pieces left float away quietly. Only a cleared level adds to score,
+## and pieces left are recorded as missed either way.
 func end_level(cleared: bool) -> void:
 	transitioning = true
 	deselect()
@@ -499,14 +562,13 @@ func end_level(cleared: bool) -> void:
 	_stop_hand()
 	if tutorial:
 		_tutorial_pending = false
-	var delay := 0.7
-	if cleared:
-		# The stars and meter filling, the star's flight, its landing, a moment
-		# to enjoy it and its trip into the counter.
-		delay = Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE + 0.1
-		_cheer()
-	else:
-		_play_varied(whoosh, 0.1)
+	if not cleared:
+		for _step in _left_to_clear:
+			star_bar.add_one()
+	# The stars and meter filling, the star's flight, its landing, a moment
+	# to enjoy it and its trip into the counter.
+	var delay := Effects.STREAM_ARRIVE + StarBar.FILL_TIME + Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE + 0.1
+	_cheer()
 	_float_away(pieces)  # anything left, as a cleared level may not need every piece
 	var id := _level_id
 	get_tree().create_timer(delay).timeout.connect(func():
@@ -515,7 +577,7 @@ func end_level(cleared: bool) -> void:
 	)
 
 
-## Once the stars have reached the meter and filled it, its star flies off with a whoosh, swinging into
+## Once the stars have reached the meter and filled it, its star flies off, swinging into
 ## the middle of the board as it grows; confetti and a jingle greet it there.
 ## Timers call methods, not lambdas, so leaving for the menu mid-cheer drops them.
 func _cheer() -> void:
@@ -530,7 +592,6 @@ func _launch_star(id: int) -> void:
 	effects.cheer(rect.get_center(), minf(rect.size.x, rect.size.y) * 0.4, CHEER_HOLD, false, star_bar.star_spot(), star_counter.star_spot())
 	get_tree().create_timer(Effects.FLIGHT + Effects.LAND + CHEER_HOLD + Effects.STORE).timeout.connect(_star_stored.bind(id))
 	star_bar.take_star()
-	_play_varied(whoosh, 0.1)
 	get_tree().create_timer(Effects.FLIGHT).timeout.connect(_star_landed.bind(id))
 
 
@@ -697,7 +758,7 @@ func _process(delta: float) -> void:
 		timer_bar.low = false
 		return
 	var remaining := maxi(0, deadline_ms - Time.get_ticks_msec())
-	timer_bar.ratio = remaining / (level_time * 1000)
+	timer_bar.ratio = minf(1.0, remaining / (level_time * 1000))  # full while the dots fade in
 	timer_bar.low = remaining < 5000
 	if remaining == 0 and not transitioning:
 		end_level(false)
@@ -730,6 +791,11 @@ func place(p: ShapeView) -> void:
 	pieces.erase(p)
 	if _counts(p):
 		_left_to_clear -= 1
+	if not p.has_meta("extra"):
+		_found_own = true
+	if endless_extra and p.has_meta("extra") and _left_to_clear > 0:
+		# Paused time doesn't count toward the wait.
+		get_tree().create_timer(PlaySettings.extra_delay, false).timeout.connect(_spawn_extra.bind(_level_id))
 	if _left_to_clear <= 0:
 		if not tutorial:
 			score += 1
