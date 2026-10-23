@@ -155,6 +155,28 @@ func _draw() -> void:
 			_arrow(Vector2(54, 128), Vector2(118, 128), "5 cm")
 			_text(Vector2(165, 50), "keep", 15, Icons.INK)
 			_text(Vector2(165, 68), "still", 15, Icons.INK)
+		"app":
+			# The Meter app: its picture with the rings, and Start.
+			_phone(Rect2(60, 4, 80, 132))
+			_round(Rect2(68, 14, 64, 14), Color("bfe5ff"), 4, false)
+			_text(Vector2(100, 21), "Meter", 11, Icons.INK)
+			_round(Rect2(68, 32, 64, 60), SCREEN, 6, false)
+			draw_arc(Vector2(100, 62), 22, 0, TAU, 32, YES, 2.5, true)
+			draw_arc(Vector2(100, 62), 12, 0, TAU, 24, YES, 2.5, true)
+			_round(Rect2(70, 100, 60, 20), Color("7bd88f"), 8)
+			_text(Vector2(100, 110), "Start", 12, Icons.INK)
+			_text(Vector2(34, 70), "Android", 15, Icons.INK)
+		"browser":
+			# A web page: the address bar with its lock, and the camera.
+			_phone(Rect2(60, 4, 80, 132))
+			_round(Rect2(68, 14, 64, 16), Color.WHITE, 8)
+			_padlock_small(Vector2(76, 22))
+			for x in [86, 96, 106, 116]:
+				draw_line(Vector2(x, 22), Vector2(x + 6, 22), Color(Icons.INK, 0.4), 2)
+			_round(Rect2(68, 36, 64, 56), Color(0.5, 0.5, 0.5), 6, false)
+			_camera_icon(Vector2(100, 64))
+			_text(Vector2(34, 70), "any", 15, Icons.INK)
+			_text(Vector2(34, 88), "phone", 15, Icons.INK)
 		"aim":
 			_phone(Rect2(60, 4, 80, 132))
 			_round(Rect2(66, 16, 68, 100), Color(0.5, 0.5, 0.5), 4)
@@ -249,6 +271,11 @@ func _padlock(at: Vector2) -> void:
 	draw_line(at + Vector2(13, -10), at + Vector2(13, 0), Icons.INK, 5)
 	_round(Rect2(at + Vector2(-20, -2), Vector2(40, 32)), SUN, 6)
 	draw_circle(at + Vector2(0, 12), 4, Icons.INK)
+
+
+func _padlock_small(at: Vector2) -> void:
+	draw_arc(at + Vector2(0, -2), 3, PI, TAU, 8, Icons.INK, 1.5, true)
+	draw_rect(Rect2(at + Vector2(-4, -2), Vector2(8, 6)), Icons.INK)
 
 
 func _lamp(at: Vector2) -> void:

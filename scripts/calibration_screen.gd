@@ -42,12 +42,12 @@ const BEFORE_YOU_START := [
 	["warm_up", "Screen on a few minutes first, seen straight on"],
 	["glare", "No lamp or window shining on the screen"],
 ]
-## [picture, caption] for each step of getting the phone measuring.
+## [picture, what to do] for each step of getting the phone measuring.
 const PHONE_STEPS := [
-	["scan", "1. Scan the code with the phone's camera"],
-	["warning", "2. It warns: tap Advanced, then Proceed"],
-	["allow", "3. Allow the camera"],
-	["hold", "4. Hold it close to this screen, still"],
+	["scan", "Scan the code with the phone's camera app."],
+	["app", "On Android, tap Get the Meter app, install it, open it and scan the code again from inside it. It measures best."],
+	["browser", "No Android phone? The page that opens measures with the browser instead."],
+	["hold", "Rest the phone facing this screen. This screen shows what to do next."],
 ]
 const DISC_CM := 3.0  # across, the solid circle in the middle of a split patch, to start with
 const DISC_RANGE := Vector2(0.03, 0.3)  # smallest and largest radius of the circle, as shares of the screen's shorter side
@@ -70,7 +70,8 @@ var _picking := false  # a tapped square is popping, so a second tap waits
 var _link: CalibrationLink
 var _camera  # the run: CameraCalibration with the web page, RawCalibration with the Meter app
 var _phone_note: Label
-var _progress_note: Label
+var _progress_note: Control  # what the phone is doing: a Label with the web page, the status panel with the Meter app
+var _status := {}  # the Meter status panel's parts, see _status_panel
 var _ended := false
 
 
@@ -263,7 +264,7 @@ func _show_intro() -> void:
 		_text(body, "About two minutes, just tapping: pick the square that's hardest to see, then the grayest grays.")
 		body.add_child(CalibrationArt.tiles([["hardest", "Tap the square that's hardest to see"], ["neutral", "Tap the grayest gray"]], Vector2(200, 140)))
 	else:
-		_text(body, "About three minutes. Another phone measures this screen with its camera, from a web page: nothing to install.")
+		_text(body, "About three minutes. A phone measures this screen with its camera: best with the small Shape Match Meter app on Android, or from a web page on any phone.")
 		body.add_child(CalibrationArt.tiles([["same_wifi", "Both on the same Wi-Fi"]], Vector2(150, 105), 16))
 	_text(body, "First, set the screen up", 24)
 	_checklist(body)
@@ -440,7 +441,7 @@ func _sample_colors() -> Array[Color]:
 
 func _show_connect() -> void:
 	DisplayCalibration.bypass = true
-	var body := _card_page("Scan this with the phone")
+	var body := _card_page("Connect your phone")
 	var waiting := _text(body, "Getting ready…")
 	_buttons(body, [["Cancel", _end.bind({}), STOP]])
 	if not _link:
@@ -463,24 +464,67 @@ func _show_connect() -> void:
 	_link.phone_seen.connect(_on_phone_seen)
 	_link.aimed.connect(_on_aimed)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 24)
+	row.add_theme_constant_override("separation", 28)
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 8)
+	row.add_child(left)
 	var qr := QrCode.new()
-	qr.custom_minimum_size = Vector2(300, 300)
+	qr.custom_minimum_size = Vector2(320, 320)
 	qr.text = _link.url(addresses[0])
-	row.add_child(qr)
-	var notes := VBoxContainer.new()
-	notes.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	notes.add_theme_constant_override("separation", 10)
-	row.add_child(notes)
+	left.add_child(qr)
+	var typed := _text(left, "Or type it in the phone's browser: " + _link.url(addresses[0]), 15, CalibrationArt.LINK)
+	typed.custom_minimum_size.x = 320
+	typed.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if addresses.size() > 1:
+		var other := _text(left, "If it doesn't open, try %s in its place." % ", ".join(addresses.slice(1)), 14, Color(Icons.INK, 0.7))
+		other.custom_minimum_size.x = 320
+		other.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var steps := VBoxContainer.new()
+	steps.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	steps.add_theme_constant_override("separation", 12)
+	row.add_child(steps)
+	for i in PHONE_STEPS.size():
+		steps.add_child(_step_row(i + 1, PHONE_STEPS[i][0], PHONE_STEPS[i][1]))
 	body.add_child(row)
 	body.move_child(row, 1)
-	notes.add_child(CalibrationArt.tiles(PHONE_STEPS, Vector2(150, 105), 16))
-	_text(notes, "No camera app? Type this into the phone's browser: " + _link.url(addresses[0]), 16, Color("1f5fa8"))
-	if addresses.size() > 1:
-		_text(notes, "If that doesn't open, try %s in its place." % ", ".join(addresses.slice(1)), 16, Color(Icons.INK, 0.8))
-	_text(notes, "The warning is because this device made its own certificate for the page; it's safe here.", 15, Color(Icons.INK, 0.7))
+	var note := _text(body, "The phone may say the page isn't private: tap Advanced, then Proceed. It's safe: this computer made its own certificate for it.", 16, Color(Icons.INK, 0.7))
+	body.move_child(note, 2)
 	_phone_note = _text(body, "Waiting for the phone…", 22)
-	body.move_child(_phone_note, 2)
+	body.move_child(_phone_note, 3)
+
+
+## One numbered step: a round number, a picture of it and what to do.
+func _step_row(number: int, picture: String, words: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	var badge := Label.new()
+	badge.text = str(number)
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge.custom_minimum_size = Vector2(40, 40)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	badge.add_theme_font_size_override("font_size", 22)
+	var look := StyleBoxFlat.new()
+	look.bg_color = Color("ffd166")
+	look.set_corner_radius_all(20)
+	look.set_border_width_all(2)
+	look.border_color = Icons.INK
+	badge.add_theme_stylebox_override("normal", look)
+	row.add_child(badge)
+	var card := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color.WHITE
+	style.set_corner_radius_all(14)
+	style.set_border_width_all(2)
+	style.border_color = Color(Icons.INK, 0.2)
+	card.add_theme_stylebox_override("panel", style)
+	card.add_child(CalibrationArt.new(picture, Vector2(112, 78)))
+	row.add_child(card)
+	var label := _text(row, words, 19)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.custom_minimum_size.x = 220
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return row
 
 
 func _check_colors() -> Array[Dictionary]:
@@ -570,20 +614,109 @@ func _show_meter_aim() -> void:
 			_place_disc(event.position / drag.size)
 	)
 	page.add_child(drag)
-	var text := "Meter app connected (%s). Rest the phone with its camera facing this screen, a few centimeters away, then drag the dark circle under the camera until the app says it's lined up, and tap Start in the app." % _phone_info.get("model", "phone")
+	var panel := _status_panel(page)
 	if int(_phone_info.get("version", 0)) < CalibrationLink.METER_VERSION:
-		text = "The Meter app on the phone is out of date. In the app, tap Update the meter (or Download it again on the page), install it, then open it again from the page."
-	var words := _text(page, text, 21, Color.WHITE)
-	words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var backing := StyleBoxFlat.new()
-	backing.bg_color = Color(0, 0, 0, 0.75)
-	backing.set_corner_radius_all(14)
-	backing.set_content_margin_all(12)
-	words.add_theme_stylebox_override("normal", backing)
-	_progress_note = words
+		_status.title.text = "Update the Meter app"
+		_status.about.text = "The app on the phone is an older version. Tap Update the meter in the app, install it, then open it again and scan this screen's code."
+	_progress_note = panel
 	_corner_stop(page)
 	_place_disc(_disc.at)
+
+
+## The Meter run's status, on paper over the white screen: while lining up,
+## what to do; while measuring, the color on screen now, what that stage is
+## for, every stage as a chip, and how far along it is.
+func _status_panel(page: Control) -> PanelContainer:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(PAPER, 0.97)
+	style.set_corner_radius_all(22)
+	style.set_border_width_all(2)
+	style.border_color = Color(Icons.INK, 0.35)
+	style.set_content_margin_all(18)
+	panel.add_theme_stylebox_override("panel", style)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 10)
+	panel.add_child(column)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	column.add_child(row)
+	var swatch := Panel.new()
+	var swatch_style := StyleBoxFlat.new()
+	swatch_style.bg_color = Color.BLACK
+	swatch_style.set_corner_radius_all(30)
+	swatch_style.set_border_width_all(3)
+	swatch_style.border_color = Icons.INK
+	swatch.add_theme_stylebox_override("panel", swatch_style)
+	swatch.custom_minimum_size = Vector2(60, 60)
+	swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(swatch)
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override("separation", 2)
+	row.add_child(words)
+	var title := _text(words, "Line the phone up", 28)
+	var about := _text(words, "Rest the phone with its camera facing this screen, a few centimeters away. Drag the dark circle under the camera until the app says Lined up, then tap Start measuring in the app.", 19, Color(Icons.INK, 0.85))
+	var chips := HFlowContainer.new()
+	chips.add_theme_constant_override("h_separation", 8)
+	chips.add_theme_constant_override("v_separation", 8)
+	chips.visible = false
+	column.add_child(chips)
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.custom_minimum_size.y = 16
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color.WHITE
+	track.set_corner_radius_all(8)
+	track.set_border_width_all(2)
+	track.border_color = Icons.INK
+	bar.add_theme_stylebox_override("background", track)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = GO
+	fill.set_corner_radius_all(8)
+	bar.add_theme_stylebox_override("fill", fill)
+	bar.max_value = 1.0
+	bar.visible = false
+	column.add_child(bar)
+	_status = {"swatch": swatch_style, "title": title, "about": about, "chips": chips, "bar": bar, "stage": -1}
+	page.add_child(panel)
+	return panel
+
+
+## Shows what the meter is measuring now (RawCalibration.showing()).
+func _update_status(show: Dictionary) -> void:
+	if _status.is_empty() or show.is_empty():
+		return
+	var stage: int = show.stage
+	var stages: Array = RawCalibration.STAGES
+	_status.swatch.bg_color = Color(show.color)
+	_status.title.text = "Measuring: %s" % show.title
+	_status.about.text = "%s  (%d of %d)" % [stages[stage].about, show.step, show.steps]
+	_status.bar.visible = true
+	_status.bar.value = _camera.progress
+	_status.chips.visible = true
+	if _status.stage == stage:
+		return
+	_status.stage = stage
+	for chip in _status.chips.get_children():
+		chip.queue_free()
+	for i in stages.size():
+		var chip := Label.new()
+		chip.text = ("✓ " if i < stage else "") + stages[i].name
+		chip.add_theme_font_size_override("font_size", 16)
+		chip.add_theme_color_override("font_color", Color(Icons.INK, 1.0 if i <= stage else 0.5))
+		var look := StyleBoxFlat.new()
+		look.bg_color = GO if i < stage else (Color("ffd166") if i == stage else Color(1, 1, 1, 0.8))
+		look.set_corner_radius_all(14)
+		look.set_border_width_all(2 if i == stage else 1)
+		look.border_color = Color(Icons.INK, 0.8 if i == stage else 0.25)
+		look.content_margin_left = 12
+		look.content_margin_right = 12
+		look.content_margin_top = 4
+		look.content_margin_bottom = 4
+		chip.add_theme_stylebox_override("normal", look)
+		_status.chips.add_child(chip)
 
 
 ## A small Stop in the corner, away from the middle the phone measures.
@@ -606,8 +739,12 @@ func _on_reading(data: Dictionary) -> Dictionary:
 	if not _camera:
 		return {"done": true, "text": "Not ready yet: scan the code again."}
 	var reply: Dictionary = _camera.on_reading(data)
-	if is_instance_valid(_progress_note) and not reply.get("done", false):
+	if not is_instance_valid(_progress_note) or reply.get("done", false):
+		return reply
+	if _progress_note is Label:
 		_progress_note.text = "Measuring: %d%%. Keep the phone still." % roundi(_camera.progress * 100)
+	else:
+		_update_status(reply.get("show", {}))
 	return reply
 
 
@@ -648,9 +785,16 @@ func _place_disc(at: Vector2) -> void:
 	_progress_note.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE if low else Control.PRESET_BOTTOM_WIDE)
 	_progress_note.offset_left = 16
 	_progress_note.offset_right = -146  # clear of Stop
-	_progress_note.offset_top = 16 if low else -120
-	_progress_note.offset_bottom = 120 if low else -16
-	_progress_note.vertical_alignment = VERTICAL_ALIGNMENT_TOP if low else VERTICAL_ALIGNMENT_BOTTOM
+	if _progress_note is Label:
+		_progress_note.offset_top = 16 if low else -120
+		_progress_note.offset_bottom = 120 if low else -16
+		_progress_note.vertical_alignment = VERTICAL_ALIGNMENT_TOP if low else VERTICAL_ALIGNMENT_BOTTOM
+		_progress_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	else:
+		# The panel keeps its own height, growing away from the edge it sits on.
+		_progress_note.offset_top = 16.0 if low else -16.0
+		_progress_note.offset_bottom = _progress_note.offset_top
+		_progress_note.grow_vertical = Control.GROW_DIRECTION_END if low else Control.GROW_DIRECTION_BEGIN
 	var stop: Control = _page.get_node_or_null("Stop")
 	if stop:
 		stop.set_anchors_preset(Control.PRESET_TOP_RIGHT if low else Control.PRESET_BOTTOM_RIGHT)
@@ -658,7 +802,6 @@ func _place_disc(at: Vector2) -> void:
 		stop.offset_right = -16
 		stop.offset_top = 16.0 if low else -70.0
 		stop.offset_bottom = stop.offset_top + 54
-	_progress_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
 ## DISC_CM across the screen itself, as far as it says how big its pixels

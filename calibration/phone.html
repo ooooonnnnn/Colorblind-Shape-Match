@@ -22,90 +22,124 @@
 	which is scaled, color managed and rounded first. Elsewhere the drawn video
 	is read. A browser never gets the sensor's raw data.
 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&display=swap">
 <style>
-	:root { --ink: #3b2f4a; --paper: #fffaf0; --sky: #bfe5ff; --go: #7bd88f; --warn: #e8a33d; --no: #e05a47; }
+	:root { --ink: #3b2f4a; --soft: #3b2f4aaa; --paper: #fffaf0; --sky: #bfe5ff; --go: #7bd88f; --sun: #ffd166; --pink: #ffb4a2; --link: #1f5fa8; --no: #e05a47; }
 	* { box-sizing: border-box; }
-	body { margin: 0; padding: 14px; font: 17px/1.4 system-ui, sans-serif; color: var(--ink); background: var(--sky); }
-	main { max-width: 560px; margin: 0 auto; background: var(--paper); border-radius: 22px; padding: 16px 16px 20px; }
-	h1 { font-size: 23px; margin: 0 0 10px; }
-	.step { display: flex; gap: 12px; align-items: center; background: #fff; border-radius: 16px; padding: 10px; margin: 8px 0; border: 2px solid #3b2f4a22; }
-	.step svg { flex: none; width: 92px; height: 66px; }
-	.step b { display: block; font-size: 18px; }
-	.num { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: #fff; font-weight: 700; display: grid; place-items: center; }
-	#view { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 14px; overflow: hidden; margin: 10px 0 8px; }
+	body { margin: 0; padding: 16px; font: 600 17px/1.45 Nunito, "Arial Rounded MT Bold", system-ui, sans-serif; color: var(--ink);
+		background: linear-gradient(#cfeaff, #fff6e0) fixed; min-height: 100vh; }
+	main { max-width: 540px; margin: 0 auto; }
+	header { display: flex; align-items: center; gap: 10px; margin: 2px 4px 14px; }
+	header svg { flex: none; }
+	header small { display: block; font-size: 14px; color: var(--soft); }
+	h1 { font-size: 26px; font-weight: 900; margin: 0; line-height: 1.1; }
+	h2 { font-size: 21px; font-weight: 900; margin: 0 0 6px; }
+	.card { background: var(--paper); border: 2.5px solid var(--ink); border-radius: 24px; padding: 18px; margin: 0 0 14px; box-shadow: 0 4px 0 #3b2f4a22; }
+	.card.best { background: #fff; }
+	.tag { display: inline-block; background: var(--sun); border: 2px solid var(--ink); border-radius: 12px; padding: 1px 10px; font-size: 14px; font-weight: 800; margin-bottom: 8px; }
+	.steps { list-style: none; padding: 0; margin: 12px 0 4px; counter-reset: n; }
+	.steps li { display: flex; gap: 12px; align-items: center; margin: 10px 0; }
+	.steps li::before { counter-increment: n; content: counter(n); flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--sun);
+		border: 2px solid var(--ink); display: grid; place-items: center; font-weight: 900; }
+	.steps svg { flex: none; width: 84px; height: 60px; background: #fff; border: 2px solid #3b2f4a33; border-radius: 12px; }
+	.steps b { display: block; font-weight: 800; }
+	details { margin: 0 0 14px; }
+	summary { list-style: none; cursor: pointer; text-align: center; color: var(--link); font-weight: 800; padding: 8px; }
+	summary::-webkit-details-marker { display: none; }
+	details[open] summary { display: none; }
+	#view { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #2c2a3a; border: 2.5px solid var(--ink); border-radius: 20px; overflow: hidden; margin: 6px 0 10px; }
 	video { width: 100%; height: 100%; object-fit: fill; }
 	#guide { position: absolute; inset: 0; width: 100%; height: 100%; }
-	#chip { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: #fff; font-weight: 600; min-height: 52px; }
-	#chip .dot { flex: none; width: 18px; height: 18px; border-radius: 50%; background: #ccc; }
-	button { font: inherit; font-weight: 700; width: 100%; padding: 15px; margin: 8px 0 4px; border: 3px solid var(--ink); border-radius: 16px; background: var(--go); color: var(--ink); }
+	#chip { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 16px; background: #fff; border: 2px solid #3b2f4a33; font-weight: 800; min-height: 56px; }
+	#chip .dot { flex: none; width: 18px; height: 18px; border-radius: 50%; background: #ccc; border: 2px solid var(--ink); }
+	.button, button { display: block; text-align: center; text-decoration: none; font: inherit; font-weight: 900; font-size: 19px; width: 100%; padding: 15px; margin: 12px 0 6px;
+		border: 2.5px solid var(--ink); border-radius: 18px; background: var(--go); color: var(--ink); box-shadow: 0 4px 0 var(--ink); cursor: pointer; }
+	.button:active, button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
 	button.quiet { background: #fff; }
 	button:disabled { opacity: 0.4; }
 	#ring { display: block; margin: 8px auto; }
 	.center { text-align: center; }
-	.small { font-size: 14px; opacity: 0.75; }
-	.warn { color: #b0402f; font-weight: 600; }
-	.best { border-color: #4caf7a; border-width: 3px; }
-	a { color: #1f5fa8; }
+	.small { font-size: 14px; color: var(--soft); }
+	.warn { color: #b0402f; font-weight: 800; }
+	a { color: var(--link); }
 	[hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <main>
-	<h1>Measure the screen</h1>
+	<header>
+		<svg width="74" height="34" viewBox="0 0 74 34"><circle cx="12" cy="17" r="10" fill="#ffb4a2" stroke="#3b2f4a" stroke-width="2"/>
+			<path d="M37 5 L40.2 12.4 L48.2 13.2 L42.2 18.6 L43.9 26.5 L37 22.4 L30.1 26.5 L31.8 18.6 L25.8 13.2 L33.8 12.4 Z" fill="#ffd166" stroke="#3b2f4a" stroke-width="2" stroke-linejoin="round"/>
+			<rect x="53" y="8" width="18" height="18" rx="4" fill="#7bd88f" stroke="#3b2f4a" stroke-width="2"/></svg>
+		<div><small>Shape Match</small><h1>Measure your screen</h1></div>
+	</header>
 
-	<section id="meter" hidden>
-		<div class="step best">
-			<svg viewBox="0 0 92 66"><rect x="28" y="2" width="36" height="62" rx="6" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><rect x="32" y="8" width="28" height="48" fill="#fffaf0"/><circle cx="46" cy="26" r="9" fill="#2c2a3a"/><circle cx="46" cy="26" r="4" fill="#7f9fd1"/><path d="M36 44 h20" stroke="#4caf7a" stroke-width="4" stroke-linecap="round"/></svg>
-			<div><b>Best: the Meter app</b>It reads the camera's raw sensor data, so the phone's picture processing can't spoil the measuring. Small (about 25 KB), straight from this screen.</div></div>
-		<a id="open-meter"><button>Open the Meter app</button></a>
-		<p class="small">The first time this downloads the app: open the download to install it (allow installing from this browser if asked), then come back here and tap the button again. <a id="get-meter">Download it again</a></p>
-		<p class="small center">or measure with this page:</p>
+	<section id="meter" class="card best" hidden>
+		<span class="tag">Best on Android</span>
+		<h2>The Shape Match Meter app</h2>
+		<div>It reads the camera's raw sensor data, so the phone's picture processing can't spoil the measuring, and it talks you through every step.</div>
+		<ol class="steps">
+			<li><svg viewBox="0 0 84 60"><rect x="26" y="4" width="32" height="52" rx="6" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><rect x="30" y="10" width="24" height="40" fill="#fffaf0"/><path d="M42 18 v16 M35 28 l7 7 l7 -7" stroke="#3b2f4a" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 42 h16" stroke="#7bd88f" stroke-width="4" stroke-linecap="round"/></svg>
+				<div><b>Get the app</b>Tap the button below. It comes from your computer (about 330 KB).</div></li>
+			<li><svg viewBox="0 0 84 60"><rect x="26" y="4" width="32" height="52" rx="6" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><rect x="30" y="10" width="24" height="40" fill="#fffaf0"/><rect x="34" y="34" width="16" height="9" rx="4" fill="#7bd88f" stroke="#3b2f4a" stroke-width="1.5"/><path d="M36 17 h12 M36 23 h9" stroke="#3b2f4a55" stroke-width="3" stroke-linecap="round"/></svg>
+				<div><b>Install it</b>Open the download. If the phone asks, allow installing from this browser.</div></li>
+			<li><svg viewBox="0 0 84 60"><rect x="4" y="10" width="40" height="34" rx="4" fill="#2c2a3a" stroke="#3b2f4a" stroke-width="2"/><rect x="15" y="17" width="18" height="18" fill="#fff"/><path d="M17 19 h5 v5 h-5z M26 19 h5 v5 h-5z M17 28 h5 v5 h-5z" fill="#3b2f4a"/><rect x="56" y="6" width="22" height="42" rx="5" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><path d="M56 26 L33 18 L33 34 Z" fill="#ffd16677"/></svg>
+				<div><b>Scan the code again, in the app</b>Or come back here and tap the button again: it opens the app already connected.</div></li>
+		</ol>
+		<a id="open-meter" class="button">Get or open the Meter app</a>
+		<p class="small center"><a id="get-meter">Download the app again</a></p>
 	</section>
 
-	<section id="intro">
-		<div class="step"><span class="num">1</span>
-			<svg viewBox="0 0 92 66"><rect x="52" y="10" width="34" height="48" rx="5" fill="#2c2a3a" stroke="#3b2f4a" stroke-width="2"/><path d="M12 14 L22 2 L32 14 Z" fill="#f4a933" stroke="#3b2f4a" stroke-width="2"/><path d="M28 20 L50 30 M28 28 L50 42" stroke="#ffd166" stroke-width="4"/><path d="M14 54 L48 6" stroke="#e05a47" stroke-width="6" stroke-linecap="round"/></svg>
-			<div><b>Dim the room</b>No lamp or window shining on the screen.</div></div>
-		<div class="step"><span class="num">2</span>
-			<svg viewBox="0 0 92 66"><rect x="14" y="4" width="8" height="54" rx="2" fill="#2c2a3a"/><path d="M60 31 L22 16 L22 46 Z" fill="#ffd16677"/><rect x="60" y="12" width="7" height="40" rx="2" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><path d="M22 62 L60 62" stroke="#3b2f4a" stroke-width="2"/><text x="41" y="58" font-size="11" text-anchor="middle" fill="#3b2f4a">close</text></svg>
-			<div><b>Hold it close</b>Straight in front of the screen, camera facing it. A little blurry is good.</div></div>
-		<div class="step"><span class="num">3</span>
-			<svg viewBox="0 0 92 66"><rect x="28" y="2" width="36" height="62" rx="6" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><rect x="32" y="8" width="28" height="48" fill="#808080"/><circle cx="46" cy="32" r="9" fill="#e6e6e6"/><circle cx="46" cy="32" r="6" fill="none" stroke="#4caf7a" stroke-width="1.5" stroke-dasharray="2 2"/><circle cx="46" cy="32" r="12" fill="none" stroke="#4caf7a" stroke-width="1.5" stroke-dasharray="2 2"/></svg>
-			<div><b>Circle between the rings</b>Move closer or back until the bright circle's edge is between the two dashed rings and they turn green.</div></div>
-		<div class="step"><span class="num">4</span>
-			<svg viewBox="0 0 92 66"><circle cx="46" cy="33" r="26" fill="#fff" stroke="#3b2f4a" stroke-width="2"/><path d="M46 33 L46 13 M46 33 L60 38" stroke="#3b2f4a" stroke-width="4" stroke-linecap="round"/><path d="M46 7 A26 26 0 0 1 72 33" fill="none" stroke="#4caf7a" stroke-width="6"/></svg>
-			<div><b>Keep still</b>About two minutes. Resting the phone on something helps.</div></div>
-		<button id="camera">Turn on the camera</button>
-	</section>
+	<details id="web" open>
+		<summary>No Android, or can't install apps? Measure with this page instead</summary>
+		<section id="intro" class="card">
+			<h2>Measure with this page</h2>
+			<ol class="steps">
+				<li><svg viewBox="0 0 92 66"><rect x="52" y="10" width="34" height="48" rx="5" fill="#2c2a3a" stroke="#3b2f4a" stroke-width="2"/><path d="M12 14 L22 2 L32 14 Z" fill="#f4a933" stroke="#3b2f4a" stroke-width="2"/><path d="M28 20 L50 30 M28 28 L50 42" stroke="#ffd166" stroke-width="4"/><path d="M14 54 L48 6" stroke="#e05a47" stroke-width="6" stroke-linecap="round"/></svg>
+					<div><b>Dim the room</b>No lamp or window shining on the screen.</div></li>
+				<li><svg viewBox="0 0 92 66"><rect x="14" y="4" width="8" height="54" rx="2" fill="#2c2a3a"/><path d="M60 31 L22 16 L22 46 Z" fill="#ffd16677"/><rect x="60" y="12" width="7" height="40" rx="2" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><path d="M22 62 L60 62" stroke="#3b2f4a" stroke-width="2"/><text x="41" y="58" font-size="11" text-anchor="middle" fill="#3b2f4a">close</text></svg>
+					<div><b>Hold it close</b>Camera facing the screen, straight on. A little blurry is good.</div></li>
+				<li><svg viewBox="0 0 92 66"><rect x="28" y="2" width="36" height="62" rx="6" fill="#cfd6e3" stroke="#3b2f4a" stroke-width="2"/><rect x="32" y="8" width="28" height="48" fill="#808080"/><circle cx="46" cy="32" r="9" fill="#e6e6e6"/><circle cx="46" cy="32" r="6" fill="none" stroke="#4caf7a" stroke-width="1.5" stroke-dasharray="2 2"/><circle cx="46" cy="32" r="12" fill="none" stroke="#4caf7a" stroke-width="1.5" stroke-dasharray="2 2"/></svg>
+					<div><b>Circle between the rings</b>Move until the bright circle's edge sits between the dashed rings and they turn green.</div></li>
+				<li><svg viewBox="0 0 92 66"><circle cx="46" cy="33" r="26" fill="#fff" stroke="#3b2f4a" stroke-width="2"/><path d="M46 33 L46 13 M46 33 L60 38" stroke="#3b2f4a" stroke-width="4" stroke-linecap="round"/><path d="M46 7 A26 26 0 0 1 72 33" fill="none" stroke="#4caf7a" stroke-width="6"/></svg>
+					<div><b>Keep still</b>About two minutes. Resting the phone on something helps.</div></li>
+			</ol>
+			<button id="camera">Turn on the camera</button>
+		</section>
+	</details>
 
-	<section id="aim" hidden>
+	<section id="aim" class="card" hidden>
+		<h2>Line up</h2>
 		<div id="view"><video id="video" playsinline muted></video>
 			<svg id="guide" viewBox="0 0 100 100" preserveAspectRatio="none">
 				<ellipse id="near" fill="none" stroke-width="0.8" stroke-dasharray="2 1.5"/>
 				<ellipse id="far" fill="none" stroke-width="0.8" stroke-dasharray="2 1.5"/>
 			</svg></div>
 		<div id="chip"><span class="dot" id="light"></span><span id="advice">Point the camera at the screen.</span></div>
-		<button id="start">Start</button>
+		<button id="start">Start measuring</button>
 		<p class="small" id="source"></p>
 	</section>
 
-	<section id="run" hidden class="center">
+	<section id="run" class="card center" hidden>
+		<h2>Measuring</h2>
 		<svg id="ring" width="170" height="170" viewBox="0 0 170 170">
 			<circle cx="85" cy="85" r="70" fill="none" stroke="#3b2f4a22" stroke-width="16"/>
 			<circle id="arc" cx="85" cy="85" r="70" fill="none" stroke="#7bd88f" stroke-width="16" stroke-linecap="round"
 				stroke-dasharray="0 440" transform="rotate(-90 85 85)"/>
-			<text id="percent" x="85" y="95" font-size="34" font-weight="700" text-anchor="middle" fill="#3b2f4a">0%</text>
+			<text id="percent" x="85" y="95" font-size="34" font-weight="900" text-anchor="middle" fill="#3b2f4a">0%</text>
 		</svg>
 		<p id="status"><b>Measuring.</b> Keep the phone still.</p>
 	</section>
 
-	<section id="end" hidden class="center">
-		<svg width="110" height="110" viewBox="0 0 110 110"><circle cx="55" cy="55" r="50" fill="#4caf7a"/><path d="M30 56 L48 74 L82 38" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+	<section id="end" class="card center" hidden>
+		<svg width="110" height="110" viewBox="0 0 110 110"><circle cx="55" cy="55" r="50" fill="#7bd88f" stroke="#3b2f4a" stroke-width="3"/><path d="M30 56 L48 74 L82 38" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+		<h2>All done!</h2>
 		<p id="done"></p>
 		<button id="again" class="quiet">Measure again</button>
-		<p class="small">To measure again, tap Try again on the screen first.</p>
+		<p class="small">To measure again, tap Try again on the computer first.</p>
 	</section>
-	<p id="error" class="warn" hidden></p>
+	<p id="error" class="card warn" hidden></p>
 	<canvas id="canvas" hidden></canvas>
 </main>
 <script>
@@ -133,6 +167,7 @@ if (/Android/i.test(navigator.userAgent)) {
 		+ `#Intent;scheme=shapematch-meter;package=com.shapematch.meter;S.browser_fallback_url=${encodeURIComponent(download)};end`;
 	$("get-meter").href = download;
 	$("meter").hidden = false;
+	$("web").open = false;
 }
 
 let track = null;
@@ -224,6 +259,7 @@ $("camera").onclick = async () => {
 	$("source").textContent = reader ? "Reading the camera's own frames directly." : "This browser only shows the camera as video, so the video is read.";
 	try { await navigator.wakeLock?.request("screen"); } catch (error) { /* the phone may dim, which is fine */ }
 	$("intro").hidden = true;
+	$("meter").hidden = true;
 	$("aim").hidden = false;
 	await measure(1);  // learns the frames' format for the hello
 	await post("/hello", {

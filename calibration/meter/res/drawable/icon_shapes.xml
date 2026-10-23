@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The game's shapes, as on the meter's header: a pink circle, a yellow star, a green square. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+	android:width="108dp" android:height="108dp"
+	android:viewportWidth="108" android:viewportHeight="108">
+	<path android:fillColor="#FFB4A2" android:strokeColor="#3B2F4A" android:strokeWidth="2"
+		android:pathData="M23.5,54 a9.5,9.5 0 1,0 19,0 a9.5,9.5 0 1,0 -19,0" />
+	<path android:fillColor="#FFD166" android:strokeColor="#3B2F4A" android:strokeWidth="2" android:strokeLineJoin="round"
+		android:pathData="M56,43 L59.06,49.79 L66.46,50.6 L60.95,55.61 L62.47,62.9 L56,59.2 L49.53,62.9 L51.05,55.61 L45.54,50.6 L52.94,49.79 Z" />
+	<path android:fillColor="#7BD88F" android:strokeColor="#3B2F4A" android:strokeWidth="2"
+		android:pathData="M72,46 h10 a3,3 0 0 1 3,3 v10 a3,3 0 0 1 -3,3 h-10 a3,3 0 0 1 -3,-3 v-10 a3,3 0 0 1 3,-3 Z" />
+</vector>

@@ -17,9 +17,16 @@ OUT="$HERE/build"
 
 rm -rf "$OUT"
 mkdir -p "$OUT/classes"
-"$JDK/bin/javac" --release 11 -Xlint:-options -classpath "$ANDROID_JAR" -d "$OUT/classes" $(find "$HERE/src" -name '*.java')
+"$JDK/bin/javac" -encoding UTF-8 --release 11 -Xlint:-options -classpath "$ANDROID_JAR" -d "$OUT/classes" $(find "$HERE/src" -name '*.java')
 "$TOOLS/d8.bat" --release --min-api 24 --lib "$ANDROID_JAR" --output "$OUT" $(find "$OUT/classes" -name '*.class')
-"$TOOLS/aapt2" link -o "$OUT/unsigned.apk" --manifest "$HERE/AndroidManifest.xml" -I "$ANDROID_JAR"
+# The icon (res) and the font (assets, kept uncompressed so it can be read in
+# place). aapt2 can't open folders on paths with non-ASCII names (this
+# project's has Hebrew), so they go through a temporary folder.
+STAGE="$(mktemp -d)"
+cp -r "$HERE/res" "$HERE/assets" "$STAGE/"
+"$TOOLS/aapt2" compile --dir "$STAGE/res" -o "$STAGE/res.zip"
+"$TOOLS/aapt2" link -o "$OUT/unsigned.apk" --manifest "$HERE/AndroidManifest.xml" -I "$ANDROID_JAR" 	-A "$STAGE/assets" -0 ttf "$STAGE/res.zip"
+rm -rf "$STAGE"
 (cd "$OUT" && "$JDK/bin/jar" uf unsigned.apk classes.dex)
 "$TOOLS/zipalign" -f -p 4 "$OUT/unsigned.apk" "$OUT/aligned.apk"
 "$TOOLS/apksigner.bat" sign --v4-signing-enabled false --ks "$KEYSTORE" --ks-pass pass:android --out "$HERE/../meter.apk" "$OUT/aligned.apk"

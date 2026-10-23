@@ -79,9 +79,25 @@ show only through hue, so a player with the matching deficiency can't see them.
   white, grays reported apart. Eye runs are logged too. The app shows the raw picture to
   line up the disc (dragged on the PC, sized from the app's `/aim`); the game
   answers `/hello` with `METER_VERSION` (`calibration_link.gd`, keep it equal
-  to `android:versionCode`) and an older app offers its update. Rebuild the APK with
-  `sh calibration/meter/build.sh` (javac, d8, aapt2, zipalign, apksigner; no
-  Gradle) after changing it; the built APK is committed.
+  to `android:versionCode`) and an older app offers its update.
+  The app scans the same QR code the web page uses (`QrReader.java`, plain
+  Java so it runs on a PC: byte/numeric/alphanumeric, versions 1-10, any level,
+  Reed-Solomon; it reads what zxing-cpp reads), so one code serves both. Its
+  look is `Look.java` (the game's colors, Nunito from `assets/` with its OFL
+  license, the logo, viewfinder, swatch, bar) and the icon is `res/`. While
+  measuring, every `/reading` answer carries `show` and `stages`
+  (`RawCalibration.showing()`, `STAGES`): the app shows and says aloud
+  (TextToSpeech, with a mute switch) the color on screen and its stage, and
+  the PC shows the same in a status panel. A phone without raw data still
+  scans, then is sent to the web page.
+  Rebuild the APK with `sh calibration/meter/build.sh` (javac, d8, aapt2,
+  zipalign, apksigner; no Gradle; aapt2 can't open folders under the Hebrew
+  path, so res and assets go through a temp folder) after changing it; the
+  built APK is committed. To see its screens without a phone, the emulator
+  AVD `meter_test` exists (`$LOCALAPPDATA/Android/Sdk/emulator`), and
+  `adb shell am start -n com.shapematch.meter/.MeterActivity --es preview
+  line_up|measure|done|problem` shows a screen with made-up data; screenshot
+  with `adb exec-out screencap -p`.
 - `scripts/extra_shapes.gd`: control pieces in colors the group's type sees.
 - `scripts/stats.gd`, `scripts/stats_screen.gd`, `scripts/xlsx_writer.gd`: per-piece
   records in `user://stats.json`, the reading of them, and the Excel export.

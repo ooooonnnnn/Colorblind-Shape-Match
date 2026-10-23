@@ -34,6 +34,17 @@ const SETTLE_MS := 400  # for the screen to change before the meter takes its pi
 const FRAMES := 3  # raw pictures averaged per reading
 const STEPS := [0.04, 0.08, 0.12, 0.17, 0.23, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]  # codes each channel is shown at
 const CHANNELS := {"r": Color.RED, "g": Color.GREEN, "b": Color.BLUE}
+const CHANNEL_NAMES := {"r": "Red", "g": "Green", "b": "Blue"}
+## The run's parts in order, as the meter and the screen tell them while measuring.
+const STAGES := [
+	{"id": "setup", "name": "White & black", "about": "The brightest and darkest this screen can show."},
+	{"id": "r", "name": "Red", "about": "How bright red gets, step by step, from dim to full."},
+	{"id": "g", "name": "Green", "about": "How bright green gets, step by step, from dim to full."},
+	{"id": "b", "name": "Blue", "about": "How bright blue gets, step by step, from dim to full."},
+	{"id": "gray", "name": "Grays", "about": "Grays from dark to light, to make each one a true gray."},
+	{"id": "before", "name": "Game colors", "about": "The game's own colors, as this screen shows them now."},
+	{"id": "after", "name": "Checking", "about": "The same colors with the calibration on, to see the difference."},
+]
 const CLIP_LIMIT := 0.001  # share of clipped pixels that makes a reading too bright
 const MAX_DARKER := 10
 const TRUSTED_GAMMAS := Vector2(1.6, 3.0)
@@ -112,19 +123,20 @@ func _build_plan() -> void:
 	_arounds.clear()
 	_stage = 0
 	_steps_taken = 0
-	_plan.append({"key": "white", "patch": _solid(Color.WHITE), "lock": not _locked})
-	_plan.append({"key": "black", "patch": _solid(Color.BLACK)})
+	_plan.append({"key": "white", "patch": _solid(Color.WHITE), "lock": not _locked, "stage": "setup", "title": "White"})
+	_plan.append({"key": "black", "patch": _solid(Color.BLACK), "stage": "setup", "title": "Black"})
 	for channel in CHANNELS:
 		var full: Color = CHANNELS[channel]
 		for code in STEPS:
-			_plan.append({"key": "%s/%s" % [channel, code], "patch": _solid(Color(full.r * code, full.g * code, full.b * code))})
+			_plan.append({"key": "%s/%s" % [channel, code], "patch": _solid(Color(full.r * code, full.g * code, full.b * code)),
+					"stage": channel, "title": "%s at %d%%" % [CHANNEL_NAMES[channel], roundi(code * 100)]})
 	for code in STEPS:
-		_plan.append({"key": "gray/%s" % code, "patch": _solid(Color(code, code, code))})
+		_plan.append({"key": "gray/%s" % code, "patch": _solid(Color(code, code, code)), "stage": "gray", "title": "Gray at %d%%" % roundi(code * 100)})
 	for check in _check_colors:
-		_plan.append({"key": "before/" + check.name, "patch": _solid(check.color)})
+		_plan.append({"key": "before/" + check.name, "patch": _solid(check.color), "stage": "before", "title": (check.name as String).capitalize()})
 	_plan.append({"kind": "solve"})
 	for check in _check_colors:
-		_plan.append({"key": "after/" + check.name, "patch": _solid(check.color, true)})
+		_plan.append({"key": "after/" + check.name, "patch": _solid(check.color, true), "stage": "after", "title": (check.name as String).capitalize()})
 	_total_steps = _plan.size() - 1
 
 
@@ -178,7 +190,27 @@ func on_reading(data: Dictionary) -> Dictionary:
 	if _done:
 		return {"done": true, "text": "Done. Look at the results on the screen."}
 	return {"id": _id, "settle": SETTLE_MS, "frames": FRAMES, "lock": _step.get("lock", false), "darker": darker,
-			"progress": progress, "text": "Too bright for the camera: turning it down and starting over…" if darker else ""}
+			"progress": progress, "text": "Too bright for the camera: turning it down and starting over…" if darker else "",
+			"show": showing(), "stages": STAGES}
+
+
+## What is on screen now, for the meter and this screen to tell: {stage (an
+## index into STAGES), title, step and steps within the stage, color}.
+func showing() -> Dictionary:
+	if _step.is_empty():
+		return {}
+	var stage := 0
+	for i in STAGES.size():
+		if STAGES[i].id == _step.get("stage", ""):
+			stage = i
+	var step := 0
+	var steps := 0
+	for planned in _plan:
+		if planned.get("stage", "") == _step.stage:
+			steps += 1
+			if planned.key == _step.key:
+				step = steps
+	return {"stage": stage, "title": _step.title, "step": step, "steps": steps, "color": "#" + (_step.patch.color as Color).to_html(false)}
 
 
 func _advance() -> void:

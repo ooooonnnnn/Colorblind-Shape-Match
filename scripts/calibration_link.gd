@@ -18,7 +18,7 @@ signal aimed(view: Dictionary)  ## while lining up, what the phone sees: {edge, 
 const PORTS := [8443, 8444, 8445, 8446, 8447]  # tried in turn, in case one is taken
 const PAGE := "res://calibration/phone.html"
 const METER := "res://calibration/meter.apk"  # the Shape Match Meter app (calibration/meter), which reads the camera's raw data
-const METER_VERSION := 4  # its android:versionCode; an older meter is told to update
+const METER_VERSION := 5  # its android:versionCode; an older meter is told to update
 const KEY_PATH := "user://calibration_tls.key"
 const CERT_PATH := "user://calibration_tls.crt"
 const IDLE_LIMIT := 30.0  # seconds a quiet connection is kept open
